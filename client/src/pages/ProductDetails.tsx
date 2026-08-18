@@ -535,10 +535,6 @@ export default function ProductDetails() {
     if (versionFilter === '__none__') return !a.versionId?.label;
     return a.versionId?.label === versionFilter;
   });
-  const features = activities.filter((a: any) => a.type === 'feature') || [];
-  const improvements = activities.filter((a: any) => a.type === 'improvement') || [];
-  const bugFixes = activities.filter((a: any) => a.type === 'bug-fix') || [];
-
   // Map WP.org contributor usernames -> avatar URL so activity authors that are
   // plugin contributors get their exact WP.org avatar (others fall back to the
   // WP.org gravatar redirect inside AuthorAvatar).

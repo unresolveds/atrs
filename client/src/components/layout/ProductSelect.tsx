@@ -22,7 +22,7 @@ export function ProductSelect({ selectedId, onSelect, className }: ProductSelect
         <SelectValue placeholder={isLoading ? "Loading products..." : "Select a product..."} />
       </SelectTrigger>
       <SelectContent>
-        {products.map((product) => (
+        {products.map((product: any) => (
           <SelectItem key={product._id} value={product._id}>
             {product.name}
           </SelectItem>

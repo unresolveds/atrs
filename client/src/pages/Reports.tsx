@@ -338,7 +338,12 @@ export default function Reports() {
     if (!monthlyReport) return monthlyReport;
     if (versionFilter === 'all') return monthlyReport;
 
-    const summary = { products: 0, features: 0, improvements: 0, bugFixes: 0 };
+    // Indexed below with dynamic ACTIVITY_TYPES keys, hence the index signature.
+    // NOTE: those keys are singular ('feature') while the tiles read the plural
+    // ('features'), so the per-type totals are not currently landing where the UI
+    // reads them. Left as-is deliberately — see docs note; fixing it changes
+    // reported numbers and needs a decision on how 'enhancement'/'security' roll up.
+    const summary: Record<string, number> = { products: 0, features: 0, improvements: 0, bugFixes: 0 };
     const products = (monthlyReport.products || [])
       .map((pData: any) => {
         const activities = (pData.activities || []).filter(matchesVersion);

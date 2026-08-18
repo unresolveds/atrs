@@ -21,7 +21,6 @@ import PageTransition, { staggerContainer, staggerItem } from '../components/lay
 import { TrendChart } from '../components/reports/TrendChart';
 import { DashboardSkeleton } from '@/components/ui/skeletons';
 import { QuickIssueDialog } from '../components/issues/QuickIssueDialog';
-import { StreakCard } from '../components/dashboard/StreakCard';
 import { classifyStale } from '../components/products/StaleProductAlert';
 import { PortfolioHealthWidget } from '../components/intelligence/PortfolioHealthWidget';
 

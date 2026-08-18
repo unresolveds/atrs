@@ -26,7 +26,7 @@ const shutdown = (signal: string) => {
     } else {
       console.log('[server]: HTTP server closed.');
     }
-    IntelligenceScheduler.stop();
+//  IntelligenceScheduler.stop();
     mongoose.connection
       .close(false)
       .then(() => {
