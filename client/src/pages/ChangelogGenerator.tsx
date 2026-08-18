@@ -190,9 +190,15 @@ export default function ChangelogGenerator() {
                 </SelectContent>
               </Select>
               {selectedProduct && (
-                <p className="text-xs text-muted-foreground truncate" title={selectedProduct.repoPath}>
-                  📂 {selectedProduct.repoPath}
-                </p>
+                <>
+                  <p className="text-xs text-muted-foreground truncate" title={selectedProduct.repoPath}>
+                    📂 {selectedProduct.repoPath}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Build output, vendored code and tests are kept out of the AI's context.
+                    Add a <span className="font-mono">.atrsignore</span> in the repo root to adjust.
+                  </p>
+                </>
               )}
             </div>
 

@@ -34,7 +34,9 @@ Flow: `ChangelogGenController` (`server/src/controllers/ChangelogGenController.t
 - Post-stream errors can't use the JSON error path — the controller checks `res.headersSent`.
 
 **Pipeline (`runPipeline`) — 5 stages, each emitting SSE progress via `ctx.emit`, cancellation-checked via `ctx.isCancelled()`:**
-1. **git** — `gitAnalyze` builds diff/log args per `rangeType` (`working`/`tags`/`commit`/`date`; `date` resolves bounding commits first), parses A/M/D/R/C statuses, skips noise (lockfiles, `.map`/`.min`, `node_modules/`, `.git/`), and fetches per-file diffs. No files → empty result with "No changes found" outputs.
+1. **git** — `gitAnalyze` builds diff/log args per `rangeType` (`working`/`tags`/`commit`/`date`; `date` resolves bounding commits first), parses A/M/D/R/C statuses, drops non-source files via `utils/atrsIgnore.ts` (built-in defaults for dependencies, build output, bundles, lockfiles and tests, plus an optional per-repo `.atrsignore` — see [../configuration/atrsignore.md](../configuration/atrsignore.md)), and fetches per-file diffs. The count skipped is emitted as a `git` progress event. No files → empty result with "No changes found" outputs.
+
+   > **`working` reads tracked changes only.** `git diff --name-status HEAD` does not list untracked files, so a brand-new file shows in `git status` but is not summarised until it is staged or committed.
 2. **classify** — `buildChunks` splits large diffs on `@@` hunk headers, packing under `MAX_CHUNK_CHARS` (3500).
 3. **summarize** — `summarizeAll` runs one Ollama JSON call per chunk (`format:'json'`, `stream:false`, deterministic options, `num_predict 200`) → `{title,type,summary,impact,breakingChange}`, normalized/clamped. Per-chunk errors are tolerated; zero total summaries aborts the run.
 4. **report** — `generateAllReports` runs 4 sequential Ollama calls, one per format, each with a format-specific system prompt (`num_predict 2000`); a per-format failure degrades to a `> ⚠️ Generation failed:` placeholder rather than failing the run.

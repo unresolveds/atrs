@@ -206,8 +206,12 @@ export function ProductForm({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Absolute path on the server machine. Used by the Git Changelog Generator to read this
-                product's repository. Click <span className="font-medium">Browse</span> to pick a folder.
+                Absolute path to this product's Git working copy on{' '}
+                <span className="font-medium">your machine</span> (where ATRS runs). The Git Changelog
+                Generator runs <span className="font-mono">git</span> there to read commits and
+                uncommitted changes. Add a <span className="font-mono">.atrsignore</span> in the repo
+                root to keep build output and vendored code out of the AI's context.
+                Click <span className="font-medium">Browse</span> to pick a folder.
               </p>
               <FormMessage />
               <RepoPathBrowser

@@ -6,7 +6,7 @@ import { runStreamJob } from '../utils/sseStream';
 import { runPipeline, type RangeType } from '../services/ChangelogGenService';
 import { getOllamaUrl, getOllamaHeaders } from '../utils/ollama';
 import { assertOwner } from '../utils/ownership';
-import { assertRepoPathAllowed } from '../utils/repoAccess';
+import { assertRepoPathAllowed, assertIsGitRepo } from '../utils/repoAccess';
 
 /**
  * POST /api/changelog-gen/generate
@@ -27,6 +27,7 @@ export const generate = async (req: Request, res: Response, next: NextFunction) 
       return res.status(400).json({ message: 'This product has no repository path configured. Set one in the product settings.' });
     }
     assertRepoPathAllowed(product!.repoPath);
+    assertIsGitRepo(product!.repoPath);
 
     // Stream the pipeline as SSE.
     await runStreamJob(req, res, async (ctx) => {

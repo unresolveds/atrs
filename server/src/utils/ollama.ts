@@ -41,9 +41,6 @@ export function getOllamaHeaders(): Record<string, string> {
     const key =
       unsealSecret(String(cfg.ollamaCloudKey || '').trim()) ||
       String(process.env.OLLAMA_CLOUD_KEY || '').trim();
-    console.log({
-      ollamaKey: key
-    })
     if (key) headers['Authorization'] = `Bearer ${key}`;
   }
   return headers;

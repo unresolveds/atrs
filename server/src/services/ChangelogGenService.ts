@@ -4,11 +4,43 @@ import path from 'path';
 import type { StreamJobContext } from '../utils/sseStream';
 import { getOllamaUrl, getOllamaHeaders, getModel, ollamaErrorMessage, DETERMINISTIC_OPTIONS, KEEP_ALIVE } from '../utils/ollama';
 import { Activity } from '../models/Activity';
+import { loadAtrsIgnore, ATRSIGNORE_FILE } from '../utils/atrsIgnore';
 
 const execFileP = promisify(execFile);
 
 /** Maximum characters of diff text sent per chunk to the model. */
 const MAX_CHUNK_CHARS = 3500;
+
+/**
+ * Token caps for the two prompt shapes: a small JSON object, and a full report.
+ *
+ * `num_predict` is a ceiling, not a target — a model that finishes early stops
+ * early — so these are sized for the worst case rather than the typical one.
+ * Reasoning models (e.g. `gpt-oss`) spend a few hundred tokens on an internal
+ * `thinking` pass *before* emitting `response`, and that comes out of the same
+ * budget. The previous caps of 200/220 were consumed by thinking alone, so the
+ * JSON came back truncated or empty and every chunk failed to parse.
+ */
+const JSON_BUDGET = 700;
+const REPORT_BUDGET = 2600;
+
+/**
+ * Returns the model's `response` text, or throws a message that names the real
+ * cause. An empty `response` alongside a populated `thinking` means the token
+ * cap ran out during the reasoning pass — reporting that as a JSON parse error
+ * (or as "check Ollama connectivity") sends people chasing the wrong problem.
+ */
+function parseableResponse(data: any, model: string): string {
+  const response = String(data?.response ?? '');
+  if (response.trim()) return response;
+  if (String(data?.thinking ?? '').trim()) {
+    throw new Error(
+      `Model "${model}" used its whole token budget on reasoning and returned no answer. ` +
+      'Raise the budget or pick a non-reasoning model.',
+    );
+  }
+  throw new Error(`Model "${model}" returned an empty response.`);
+}
 
 // ────────────────────────────────────────────────────────────────────
 // Helpers
@@ -36,46 +68,15 @@ function classifyFile(filePath: string): string {
   return 'other';
 }
 
-/** Filter out files we don't want the AI to summarise. */
-// function isNoise(filePath: string): boolean {
-//   const lower = filePath.toLowerCase();
-//   return (
-//     /package-lock\.json|yarn\.lock|pnpm-lock\.yaml|shrinkwrap\.json/i.test(lower) ||
-//     /\.(map|min\.(js|css)|lock)$/i.test(lower) ||
-//     lower.includes('node_modules/') ||
-//     lower.includes('.git/') ||
-//     lower.includes('.gitignore') ||
-//     lower.includes('.CHANGELOG-1.8.9.md') ||
-//     lower.includes('docs/') ||
-//     lower.includes('dist') ||
-//     lower.includes('tools') ||
-//     lower.includes('AI-product-inteligence-doc') ||
-//     lower.includes('.claude') ||
-//     lower.includes('implementation_plan.md') ||
-//     lower.includes('bundled')
+// Which files reach the model is decided by `utils/atrsIgnore.ts`: built-in
+// defaults for dependencies, build output, bundles, lockfiles and tests, plus an
+// optional per-repo `.atrsignore` that can extend or override them.
+//
+// This replaced a hardcoded substring filter that dropped any path merely
+// containing "dist" or "tools" (so `src/redistribute.ts` never reached the model,
+// and every .md file was discarded), and that baked one project's own paths into
+// logic shared by every user's repo.
 
-
-
-//   );
-// }
-function isNoise(filePath: string): boolean {
-  const lower = filePath.toLowerCase();
-  return (
-    /package-lock\.json|yarn\.lock|pnpm-lock\.yaml|shrinkwrap\.json/i.test(lower) ||
-    /\.(map|min\.(js|css)|lock|md)$/i.test(lower) ||
-    lower.includes('node_modules/') ||
-    lower.includes('.git/') ||
-    lower.includes('.gitignore') ||
-    lower.includes('.changelog-1.8.9.md') ||
-    lower.includes('docs/') ||
-    lower.includes('dist') ||
-    lower.includes('tools') ||
-    lower.includes('ai-product-inteligence-doc') ||
-    lower.includes('.claude') ||
-    lower.includes('implementation_plan.md') ||
-    lower.includes('bundled')
-  );
-}
 // ────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────
@@ -158,8 +159,11 @@ async function gitAnalyze(
       logArgs = ['log', '--oneline', '--end-of-options', range];
       break;
     case 'date': {
-      const since = `--since="${from}"`;
-      const until = to ? `--until="${to}"` : '';
+      // No shell here (execFile takes an argv array), so these quotes were never
+      // stripped — git only tolerated them because approxidate skips characters
+      // it can't parse. Pass the value bare rather than rely on that.
+      const since = `--since=${from}`;
+      const until = to ? `--until=${to}` : '';
       logArgs = ['log', '--oneline', since, ...(until ? [until] : [])];
       // For date range we'll use the log to find bounding commits.
       const { stdout: firstCommit } = await execFileP('git', ['log', '--oneline', '--reverse', '--format=%H', since, ...(until ? [until] : [])], execOpts);
@@ -207,12 +211,24 @@ async function gitAnalyze(
     }
   }
 
-  // Filter noise and get per-file diffs
+  // Keep only source files, then collect their per-file diffs.
+  const atrsIgnore = loadAtrsIgnore(repoPath);
+  const kept = parsedFiles.filter((f) => atrsIgnore.accepts(f.path));
+  const skipped = parsedFiles.length - kept.length;
+  if (skipped > 0) {
+    ctx?.emit({
+      type: 'info',
+      step: 'git',
+      message: atrsIgnore.hasFile
+        ? `Skipped ${skipped} non-source file(s) — ${ATRSIGNORE_FILE} (${atrsIgnore.filePatternCount} rules) plus defaults`
+        : `Skipped ${skipped} non-source file(s) — default ignore rules (add ${ATRSIGNORE_FILE} to customise)`,
+    });
+  }
+
   const files: ChangedFile[] = [];
   const diffRange = rangeType === 'working' ? ['HEAD'] : ['--end-of-options', range];
 
-  for (const f of parsedFiles) {
-    if (isNoise(f.path)) continue;
+  for (const f of kept) {
     let diff = '';
     if (f.status !== 'D') {
       try {
@@ -320,7 +336,7 @@ async function summarizeChunk(chunk: Chunk, model: string): Promise<ChunkSummary
       stream: false,
       format: 'json',
       keep_alive: KEEP_ALIVE,
-      options: { ...DETERMINISTIC_OPTIONS, num_predict: 200 },
+      options: { ...DETERMINISTIC_OPTIONS, num_predict: JSON_BUDGET },
     }),
   });
 
@@ -330,7 +346,7 @@ async function summarizeChunk(chunk: Chunk, model: string): Promise<ChunkSummary
   }
 
   const data: any = await res.json();
-  const parsed = JSON.parse(data.response);
+  const parsed = JSON.parse(parseableResponse(data, model));
 
   return {
     file: chunk.file,
@@ -462,7 +478,7 @@ async function generateReport(
       prompt,
       stream: false,
       keep_alive: KEEP_ALIVE,
-      options: { ...DETERMINISTIC_OPTIONS, num_predict: 2000 },
+      options: { ...DETERMINISTIC_OPTIONS, num_predict: REPORT_BUDGET },
     }),
   });
 
@@ -606,7 +622,7 @@ async function summarizeCommit(
       headers: getOllamaHeaders(),
       body: JSON.stringify({
         model, prompt, stream: false, format: 'json', keep_alive: KEEP_ALIVE,
-        options: { ...DETERMINISTIC_OPTIONS, num_predict: 220 },
+        options: { ...DETERMINISTIC_OPTIONS, num_predict: JSON_BUDGET },
       }),
     });
     if (!res.ok) {
@@ -614,7 +630,7 @@ async function summarizeCommit(
       throw new Error(ollamaErrorMessage(res.status, body, model));
     }
     const data: any = await res.json();
-    parsed = JSON.parse(data.response);
+    parsed = JSON.parse(parseableResponse(data, model));
   } catch {
     // Fall back to the commit subject so a model hiccup still yields an entry.
     parsed = {};
@@ -681,7 +697,7 @@ async function synthesizeLogicalEntries(
       headers: getOllamaHeaders(),
       body: JSON.stringify({
         model, prompt, stream: false, format: 'json', keep_alive: KEEP_ALIVE,
-        options: { ...DETERMINISTIC_OPTIONS, num_predict: 1500 },
+        options: { ...DETERMINISTIC_OPTIONS, num_predict: REPORT_BUDGET },
       }),
     });
     if (!res.ok) {
@@ -689,7 +705,7 @@ async function synthesizeLogicalEntries(
       throw new Error(ollamaErrorMessage(res.status, body, model));
     }
     const data: any = await res.json();
-    const parsed = JSON.parse(data.response);
+    const parsed = JSON.parse(parseableResponse(data, model));
     const list: any[] = Array.isArray(parsed?.entries) ? parsed.entries : [];
     const seen = new Set<string>();
     return list.map((e, idx) => {
@@ -794,7 +810,12 @@ export async function runPipeline(
   const summaries = await summarizeAll(chunks, model, ctx);
 
   if (summaries.length === 0) {
-    throw new Error('No chunks could be summarised — check Ollama connectivity');
+    // Every chunk failed. Connectivity is only one possible cause — the model
+    // name, the token budget and a refused key all land here too, so point at
+    // the per-chunk errors already streamed rather than guessing.
+    throw new Error(
+      `No chunks could be summarised with model "${model}". See the per-file errors above for the cause.`,
+    );
   }
 
   // Stage 4: Report Generator

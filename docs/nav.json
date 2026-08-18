@@ -155,6 +155,12 @@
     "children": [
       {
         "type": "file",
+        "name": "`.atrsignore` — controlling what the AI sees",
+        "filename": "atrsignore.md",
+        "path": "configuration/atrsignore.md"
+      },
+      {
+        "type": "file",
         "name": "Environment Variables",
         "filename": "environment-variables.md",
         "path": "configuration/environment-variables.md"
