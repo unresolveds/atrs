@@ -14,7 +14,7 @@ bootstrap().catch((err) => {
 
 const server: http.Server = app.listen(port, '0.0.0.0', () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
-//  IntelligenceScheduler.initialize();
+ IntelligenceScheduler.initialize();
 });
 
 // Graceful shutdown: stop accepting connections, then close the DB.
