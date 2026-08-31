@@ -36,7 +36,7 @@ import { ReportsSkeleton } from '@/components/ui/skeletons';
 import { MediaCarousel } from '@/components/ui/media-carousel';
 import { AuthorAvatar } from '@/components/ui/AuthorAvatar';
 import { PresentationMode } from '../components/reports/PresentationMode';
-import { ACTIVITY_TYPES } from '../../../consts';
+import { ACTIVITY_TYPES } from '../../../server/src/constants/activityTypes';
 
 const months = [
   'January', 'February', 'March', 'April', 'May', 'June',

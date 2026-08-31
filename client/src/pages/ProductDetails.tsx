@@ -37,7 +37,7 @@ import { ProductDetailsSkeleton, ProductActivitiesSkeleton } from '@/components/
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ACTIVITY_TYPES } from '../../../consts';
+import { ACTIVITY_TYPES } from '../../../server/src/constants/activityTypes';
 
 // Issue status / severity → badge classes, dark-mode aware (mirrors the Issue Tracker).
 const ISSUE_STATUS_BADGE: Record<string, string> = {

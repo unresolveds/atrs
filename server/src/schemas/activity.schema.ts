@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { objectId } from './common.schema';
-import { ACTIVITY_TYPES } from '../../../consts/index';
+import { ACTIVITY_TYPES } from '../constants/activityTypes';
 
 export const createActivitySchema = z.object({
   body: z.object({

@@ -90,7 +90,3 @@ server/_tmp_truedup.ts
 
 
 AI-product-inteligence-doc
-# tsc emits this beside the shared TS source when building the server (the
-# rootDir violation in server/tsconfig.json). It shadowed consts/index.ts for
-# Vite, which resolves .js before .ts, and broke every ACTIVITY_TYPES import.
-consts/*.js
