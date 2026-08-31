@@ -19,7 +19,11 @@ import { getIssues, type Issue } from '../../services/issues';
 import { MediaUploader } from '@/components/ui/MediaUploader';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { format } from 'date-fns';
-import { ACTIVITY_TYPES } from '../../../../consts/index';
+// Extension is explicit on purpose: building the server emits a CommonJS
+// consts/index.js beside the shared source, and Vite resolves .js before .ts.
+// Without the extension that artifact wins, ACTIVITY_TYPES arrives undefined,
+// and the z.enum() below throws while this module is still loading.
+import { ACTIVITY_TYPES } from '../../../../consts/index.ts';
 const formSchema = z.object({
   productId: z.string().min(1, 'Product is required'),
   type: z.enum(ACTIVITY_TYPES),

@@ -6,7 +6,10 @@ import { getProducts } from '../services/products';
 import { useAddProduct } from '../contexts/AddProductContext';
 import { getUsers } from '../services/users';
 import { useAuth } from '../contexts/AuthContext';
-import { ACTIVITY_TYPES } from '.././../../consts/index';
+// Extension is explicit on purpose — see the note in ActivityForm.tsx: a
+// CommonJS consts/index.js emitted by the server build would otherwise shadow
+// the .ts source and make ACTIVITY_TYPES undefined.
+import { ACTIVITY_TYPES } from '../../../consts/index.ts';
 import { playSound } from '@/lib/sound';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
