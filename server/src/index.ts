@@ -1,7 +1,7 @@
 import http from 'http';
 import mongoose from 'mongoose';
 import app, { bootstrap } from './app';
-// import { IntelligenceScheduler } from './services/intelligence/IntelligenceScheduler';
+import { IntelligenceScheduler } from './services/intelligence/IntelligenceScheduler';
 
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
@@ -14,7 +14,7 @@ bootstrap().catch((err) => {
 
 const server: http.Server = app.listen(port, '0.0.0.0', () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
- IntelligenceScheduler.initialize();
+  IntelligenceScheduler.initialize();
 });
 
 // Graceful shutdown: stop accepting connections, then close the DB.
@@ -26,7 +26,7 @@ const shutdown = (signal: string) => {
     } else {
       console.log('[server]: HTTP server closed.');
     }
-//  IntelligenceScheduler.stop();
+    IntelligenceScheduler.stop();
     mongoose.connection
       .close(false)
       .then(() => {
