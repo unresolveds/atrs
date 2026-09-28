@@ -5,11 +5,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * cover the derived arithmetic and the query shape without needing a database.
  */
 let groupedRows: any[] = [];
+let versionRows: any[] = [];
+let trendRows: any[] = [];
 let quoteRows: any[] = [];
 let allTime = 0;
 let latest: any = null;
 /** The sort handed to the quote query — paging correctness depends on it. */
 const quoteSort = vi.fn();
+
+/**
+ * Three aggregations run per call (reasons, versions, months). They are told
+ * apart by their `$group._id`, so the mock cannot silently feed reason rows to
+ * the trend and appear to pass.
+ */
+function aggregateFor(pipeline: any[]): any[] {
+  const id = pipeline.find((s) => s.$group)?.$group?._id;
+  if (id === '$version') return versionRows;
+  if (id && typeof id === 'object' && id.$dateToString) return trendRows;
+  return groupedRows;
+}
 
 vi.mock('../../../models/UninstallFeedback', () => {
   const findChain: any = {
@@ -25,7 +39,7 @@ vi.mock('../../../models/UninstallFeedback', () => {
   };
   return {
     UninstallFeedback: {
-      aggregate: async () => groupedRows,
+      aggregate: async (pipeline: any[]) => aggregateFor(pipeline),
       find: () => findChain,
       findOne: () => findOneChain,
       countDocuments: async () => allTime,
@@ -38,6 +52,8 @@ const PID = '507f1f77bcf86cd799439011';
 
 beforeEach(() => {
   groupedRows = [];
+  versionRows = [];
+  trendRows = [];
   quoteRows = [];
   allTime = 0;
   latest = null;
@@ -140,5 +156,78 @@ describe('coverage reporting', () => {
 
   it('defaults to a 90-day window', async () => {
     expect((await ChurnAnalytics.summarize(PID)).windowDays).toBe(90);
+  });
+});
+
+describe('actionable buckets', () => {
+  it('splits reasons by what can be done about them', async () => {
+    groupedRows = [
+      { _id: 4, reason: 'Broke the website', count: 3, withText: 0 },   // product
+      { _id: 12, reason: "Didn't work", count: 2, withText: 0 },        // product
+      { _id: 13, reason: 'Expected something else', count: 2, withText: 0 }, // positioning
+      { _id: 2, reason: 'Found a better alternative', count: 1, withText: 0 }, // competitive
+      { _id: 15, reason: 'Temporary deactivation', count: 2, withText: 0 },   // unactionable
+    ];
+    const s = await ChurnAnalytics.summarize(PID);
+    const by = (b: string) => s.buckets.find((x) => x.bucket === b);
+    expect(by('product')!.count).toBe(5);
+    expect(by('positioning')!.count).toBe(2);
+    expect(by('competitive')!.count).toBe(1);
+    expect(by('unactionable')!.count).toBe(2);
+    // Buckets partition the window; nothing is counted twice or lost.
+    expect(s.buckets.reduce((a, b) => a + b.count, 0)).toBe(s.total);
+  });
+
+  it('does not count a temporary deactivation as a product failure', async () => {
+    groupedRows = [{ _id: 15, reason: 'Temporary deactivation', count: 9, withText: 0 }];
+    const s = await ChurnAnalytics.summarize(PID);
+    expect(s.buckets.find((b) => b.bucket === 'product')).toBeUndefined();
+    expect(s.buckets[0].bucket).toBe('unactionable');
+  });
+
+  it('treats an unrecognised reason id as unactionable rather than blaming the product', async () => {
+    // Freemius adds reasons over time; a new id must not inflate the failure count.
+    groupedRows = [{ _id: 999, reason: 'Some new reason', count: 4, withText: 0 }];
+    const s = await ChurnAnalytics.summarize(PID);
+    expect(s.buckets[0].bucket).toBe('unactionable');
+  });
+
+  it('ranks buckets by size and lists the reasons behind each', async () => {
+    groupedRows = [
+      { _id: 1, reason: 'No longer needed', count: 1, withText: 0 },
+      { _id: 4, reason: 'Broke the website', count: 5, withText: 0 },
+    ];
+    const s = await ChurnAnalytics.summarize(PID);
+    expect(s.buckets[0].bucket).toBe('product');
+    expect(s.buckets[0].reasons[0]).toEqual({ reason: 'Broke the website', count: 5 });
+  });
+});
+
+describe('by version', () => {
+  it('reports totals and how many blamed the product', async () => {
+    groupedRows = [{ _id: 4, reason: 'Broke the website', count: 10, withText: 0 }];
+    versionRows = [
+      { _id: '1.2.3', count: 7, productFailures: 6 },
+      { _id: '1.2.2', count: 3, productFailures: 1 },
+    ];
+    const s = await ChurnAnalytics.summarize(PID);
+    expect(s.byVersion[0]).toEqual({ version: '1.2.3', count: 7, productFailures: 6, share: 70 });
+    expect(s.byVersion[1].share).toBe(30);
+  });
+
+  it('is empty when no report carried a version', async () => {
+    expect((await ChurnAnalytics.summarize(PID)).byVersion).toEqual([]);
+  });
+});
+
+describe('trend', () => {
+  it('passes monthly buckets through oldest first', async () => {
+    trendRows = [
+      { _id: '2026-07', total: 4, productFailures: 1 },
+      { _id: '2026-08', total: 9, productFailures: 5 },
+    ];
+    const s = await ChurnAnalytics.summarize(PID);
+    expect(s.trend.map((t) => t.month)).toEqual(['2026-07', '2026-08']);
+    expect(s.trend[1].productFailures).toBe(5);
   });
 });

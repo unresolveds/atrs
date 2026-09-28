@@ -169,10 +169,15 @@ export class FreemiusSyncService {
         result.requests++;
         if (installs.length === 0) { result.nextOffset = undefined; return result; }
 
+        // If the budget runs out part-way through a page, the page must be
+        // re-scanned on resume rather than stepped over — advancing past it
+        // would skip those installs permanently. Re-scanning is nearly free
+        // because rows already stored are skipped before spending a request.
+        let exhaustedMidPage = false;
         for (const inst of installs) {
           if (!inst.is_uninstalled) continue;
+          if (result.requests >= maxRequests) { exhaustedMidPage = true; break; }
           result.examined++;
-          if (result.requests >= maxRequests) break;
 
           const known = await UninstallFeedback.exists({
             productId: product._id, freemiusInstallId: inst.id,
@@ -185,6 +190,8 @@ export class FreemiusSyncService {
           await this.store(product, inst.id, u, inst);
           result.stored++;
         }
+
+        if (exhaustedMidPage) { result.nextOffset = offset; return result; }
 
         offset += installs.length;
         // A short page means the collection is exhausted.

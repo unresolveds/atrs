@@ -678,6 +678,31 @@ export interface ChurnQuote {
   version?: string;
 }
 
+
+/** What a team can actually do about a departure. */
+export type ChurnBucket = 'product' | 'positioning' | 'competitive' | 'unactionable';
+
+export interface BucketRollup {
+  bucket: ChurnBucket;
+  count: number;
+  share: number;
+  reasons: Array<{ reason: string; count: number }>;
+}
+
+export interface VersionChurn {
+  version: string;
+  count: number;
+  productFailures: number;
+  share: number;
+}
+
+export interface ChurnTrendPoint {
+  /** YYYY-MM */
+  month: string;
+  total: number;
+  productFailures: number;
+}
+
 export interface ChurnSummary {
   /** False when the product has no Freemius credentials resolved. */
   connected: boolean;
@@ -685,6 +710,9 @@ export interface ChurnSummary {
   total: number;
   withText: number;
   breakdown: ReasonBreakdown[];
+  buckets: BucketRollup[];
+  byVersion: VersionChurn[];
+  trend: ChurnTrendPoint[];
   quotes: ChurnQuote[];
   lastReportAt: string | null;
   totalAllTime: number;
