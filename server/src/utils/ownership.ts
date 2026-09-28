@@ -19,13 +19,22 @@ import { roleAtLeast, type StoreRole } from '../models/Store';
  *    probed for existence.
  */
 
+/**
+ * An ObjectId no document carries. It has to be *castable*, not merely
+ * impossible: a sentinel like '__no_store__' makes Mongoose throw a CastError,
+ * which surfaces as a 500 instead of an empty list — safe, but indistinguishable
+ * from a real fault. `null` is worse still, since it matches any document whose
+ * storeId was never set.
+ */
+const NO_STORE = '000000000000000000000000';
+
 /** Filter restricting a query to what `user` may read. */
 export function storeFilter(user: AuthUser | undefined, base: Record<string, unknown> = {}): Record<string, unknown> {
-  if (!user) return { ...base, storeId: null as never };
+  if (!user) return { ...base, storeId: NO_STORE };
   if (user.role === 'admin') return { ...base };
-  // An impossible id rather than an absent clause: an unscoped filter here would
-  // return every store's rows.
-  if (!user.storeId) return { ...base, storeId: '__no_store__' as never };
+  // An unmatchable id rather than an absent clause: omitting the clause would
+  // return every store's rows to someone who belongs to none.
+  if (!user.storeId) return { ...base, storeId: NO_STORE };
   return { ...base, storeId: user.storeId };
 }
 

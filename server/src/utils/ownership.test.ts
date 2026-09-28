@@ -164,3 +164,22 @@ describe('roleAtLeast', () => {
     expect(roleAtLeast(undefined, 'developer')).toBe(false);
   });
 });
+
+describe('the no-store sentinel', () => {
+  it('is a castable ObjectId, not a made-up string', () => {
+    // A non-castable sentinel makes Mongoose throw a CastError, which the API
+    // reports as a 500 — safe, but a fault rather than an empty list.
+    const f = storeFilter(storeless) as Record<string, string>;
+    expect(f.storeId).toMatch(/^[0-9a-f]{24}$/);
+  });
+
+  it('is not null, which would match documents that never had a store', () => {
+    for (const u of [storeless, undefined]) {
+      expect((storeFilter(u) as Record<string, unknown>).storeId).not.toBe(null);
+    }
+  });
+
+  it('is the same for a storeless user and for no user at all', () => {
+    expect(storeFilter(storeless)).toEqual(storeFilter(undefined));
+  });
+});
