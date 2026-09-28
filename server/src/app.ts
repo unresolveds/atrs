@@ -12,6 +12,7 @@ import { seedAndMigrate } from './scripts/seedAndMigrate';
 import { isServerless, loadAppConfigCache } from './utils/appConfig';
 
 import productRoutes from './routes/productRoutes';
+import storeRoutes from './routes/storeRoutes';
 import activityRoutes from './routes/activityRoutes';
 import reportRoutes from './routes/reportRoutes';
 import uploadRoutes from './routes/uploadRoutes';
@@ -123,6 +124,7 @@ app.use('/api/tools', readmeToolsRoutes);
 app.use('/api/public', publicRoutes);
 
 // Authenticated + active-account routes
+app.use('/api/stores', requireAuth, requireActive, storeRoutes);
 app.use('/api/products', requireAuth, requireActive, productRoutes);
 app.use('/api/activities', requireAuth, requireActive, activityRoutes);
 app.use('/api/reports', requireAuth, requireActive, reportRoutes);
