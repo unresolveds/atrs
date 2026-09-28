@@ -86,6 +86,7 @@ implementation_plan.md
 .vercel
 
 # temp files
+server/__*.ts
 server/_tmp_truedup.ts
 
 
