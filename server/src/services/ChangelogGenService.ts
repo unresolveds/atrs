@@ -92,7 +92,7 @@ export interface GenerateInput {
   /** Product the generated entries belong to (for the review queue). */
   productId?: string;
   /** Owner the drafted review entries are scoped to. */
-  ownerId?: string;
+  storeId?: string;
   /** When false, skip creating review-queue drafts (reports only). Defaults to true. */
   createReviewEntries?: boolean;
 }
@@ -737,7 +737,7 @@ async function synthesizeLogicalEntries(
 async function persistReviewEntries(
   entries: ReviewEntry[],
   productId: string,
-  ownerId: string,
+  storeId: string,
   ctx?: StreamJobContext,
 ): Promise<number> {
   let created = 0;
@@ -751,7 +751,7 @@ async function persistReviewEntries(
         { importSourceKey, needsReview: true },
         {
           $set: {
-            productId, ownerId,
+            productId, storeId,
             type: e.type,
             title: e.title,
             shortDescription,
@@ -825,7 +825,7 @@ export async function runPipeline(
   // ranges, or a single AI-grouped pass for the working tree (no commits).
   // Skipped when the caller opts out or the product is unknown.
   let reviewEntriesCreated = 0;
-  if (input.createReviewEntries !== false && input.productId && input.ownerId) {
+  if (input.createReviewEntries !== false && input.productId && input.storeId) {
     const commitBased = input.rangeType !== 'working' && !!range;
     let entries: ReviewEntry[] = [];
     if (commitBased) {
@@ -836,7 +836,7 @@ export async function runPipeline(
     if (entries.length === 0) {
       entries = await synthesizeLogicalEntries(summaries, model, ctx);
     }
-    reviewEntriesCreated = await persistReviewEntries(entries, input.productId, input.ownerId, ctx);
+    reviewEntriesCreated = await persistReviewEntries(entries, input.productId, input.storeId, ctx);
   }
 
   return {

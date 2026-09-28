@@ -21,9 +21,18 @@ vi.mock('../models/Product', () => ({
 
 const { generate, getTags } = await import('./ChangelogGenController');
 
-const ALICE = { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', role: 'user', name: 'Alice', email: 'a@x.test' };
-const BOB = { id: 'bbbbbbbbbbbbbbbbbbbbbbbb', role: 'user', name: 'Bob', email: 'b@x.test' };
-const ADMIN = { id: 'cccccccccccccccccccccccc', role: 'admin', name: 'Root', email: 'c@x.test' };
+// Two stores, and a member of each. Isolation is per store now, not per user:
+// a colleague of Alice's must see her products, a member of another store must not.
+const ACME = '111111111111111111111111';
+const GLOBEX = '222222222222222222222222';
+
+const ALICE = { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', role: 'user', storeId: ACME, storeRole: 'owner', name: 'Alice' };
+/** Alice's colleague — same store, lower role. Must still reach the store's products. */
+const DEV = { id: 'dddddddddddddddddddddddd', role: 'user', storeId: ACME, storeRole: 'developer', name: 'Dev' };
+const BOB = { id: 'bbbbbbbbbbbbbbbbbbbbbbbb', role: 'user', storeId: GLOBEX, storeRole: 'owner', name: 'Bob' };
+const ADMIN = { id: 'cccccccccccccccccccccccc', role: 'admin', name: 'Root' };
+/** Signed up, no store yet — must reach nothing at all. */
+const STORELESS = { id: 'eeeeeeeeeeeeeeeeeeeeeeee', role: 'user', name: 'New' };
 
 let root: string;
 let aliceRepo: string;
@@ -100,8 +109,8 @@ function productIs(doc: any) {
   findById.mockReturnValue({ select: () => ({ lean: async () => doc }) });
 }
 
-const aliceProduct = () => ({ _id: 'p-alice', name: 'Alice Plugin', repoPath: aliceRepo, ownerId: ALICE.id });
-const bobProduct = () => ({ _id: 'p-bob', name: 'Bob Plugin', repoPath: bobRepo, ownerId: BOB.id });
+const aliceProduct = () => ({ _id: 'p-alice', name: 'Acme Plugin', repoPath: aliceRepo, storeId: ACME });
+const bobProduct = () => ({ _id: 'p-bob', name: 'Globex Plugin', repoPath: bobRepo, storeId: GLOBEX });
 
 describe('ownership boundary — getTags', () => {
   it("returns the owner's own tags", async () => {
@@ -227,5 +236,56 @@ describe('each user\'s data comes from their own working copy', () => {
     // Source is kept for both.
     expect(alice.accepts('source.js')).toBe(true);
     expect(bob.accepts('source.js')).toBe(true);
+  });
+});
+
+describe('store membership, not personal ownership', () => {
+  it("lets a colleague reach the store's product", async () => {
+    // The whole point of the refactor: Alice's developer sees Acme's products
+    // even though Alice created them.
+    productIs(aliceProduct());
+    const { res, cap } = fakeRes();
+    await getTags({ params: { productId: 'p-alice' }, user: DEV } as any, res, ((e: any) => { cap.nextErr = e; }) as any);
+    expect(cap.nextErr).toBeUndefined();
+    expect(cap.body).toEqual(['v1.0.0']);
+  });
+
+  it('still refuses a member of a different store', async () => {
+    productIs(aliceProduct());
+    const { res, cap } = fakeRes();
+    await getTags({ params: { productId: 'p-alice' }, user: BOB } as any, res, ((e: any) => { cap.nextErr = e; }) as any);
+    expect(cap.nextErr?.statusCode).toBe(404);
+    expect(cap.body).toBeUndefined();
+  });
+
+  it('gives a user with no store access to nothing', async () => {
+    // The dangerous case: an absent storeId must match no documents rather than
+    // behaving like an unscoped query.
+    productIs(aliceProduct());
+    const { res, cap } = fakeRes();
+    await getTags({ params: { productId: 'p-alice' }, user: STORELESS } as any, res, ((e: any) => { cap.nextErr = e; }) as any);
+    expect(cap.nextErr?.statusCode).toBe(404);
+    expect(cap.body).toBeUndefined();
+  });
+
+  it('does not leak the other store\'s tags or path in the refusal', async () => {
+    productIs(bobProduct());
+    const { res, cap } = fakeRes();
+    await getTags({ params: { productId: 'p-bob' }, user: ALICE } as any, res, ((e: any) => { cap.nextErr = e; }) as any);
+    const message = String(cap.nextErr?.message ?? '');
+    expect(message).not.toContain('v9.9.9');
+    expect(message).not.toContain(bobRepo);
+  });
+
+  it('refuses to run the pipeline for a storeless user before any stream opens', async () => {
+    productIs(aliceProduct());
+    const { res, cap } = fakeRes();
+    await generate(
+      { body: { productId: 'p-alice', rangeType: 'working' }, user: STORELESS } as any,
+      res,
+      ((e: any) => { cap.nextErr = e; }) as any,
+    );
+    expect(cap.nextErr?.statusCode).toBe(404);
+    expect(res.headersSent).toBe(false);
   });
 });

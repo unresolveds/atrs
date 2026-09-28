@@ -3,7 +3,7 @@ import { IProductMarketing } from '../models/ProductMarketing';
 import { Product } from '../models/Product';
 import { deleteMediaFiles } from '../utils/fileUtils';
 import { AuditLogService } from './AuditLogService';
-import { assertOwner } from '../utils/ownership';
+import { assertStoreAccess } from '../utils/ownership';
 import createHttpError from '../utils/httpError';
 import type { AuthUser } from '../types/auth';
 
@@ -20,7 +20,7 @@ export class ProductMarketingService {
   private async assertProductOwned(productId: string, user: AuthUser) {
     if (!productId) throw createHttpError(400, 'Product ID is required');
     const product = await Product.findById(productId);
-    assertOwner(product, user);
+    assertStoreAccess(product, user);
     return product!;
   }
 
@@ -32,9 +32,9 @@ export class ProductMarketingService {
   async upsertMarketingData(productId: string, data: Partial<IProductMarketing>, user: AuthUser): Promise<IProductMarketing> {
     const product = await this.assertProductOwned(productId, user);
     const clean: any = { ...data };
-    delete clean.ownerId;
+    delete clean.storeId;
     delete clean.productId;
-    const result = await this.repository.upsertByProductId(productId, { ...clean, ownerId: product.ownerId });
+    const result = await this.repository.upsertByProductId(productId, { ...clean, storeId: product.storeId });
     await auditLogService.logEvent('UPDATE', 'MARKETING', productId, product.name, 'Updated marketing hub', { id: user.id, name: user.name });
     return result;
   }

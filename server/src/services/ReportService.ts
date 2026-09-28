@@ -1,10 +1,10 @@
 import { Activity } from '../models/Activity';
 import mongoose from 'mongoose';
-import { scopeFilter } from '../utils/ownership';
+import { storeFilter } from '../utils/ownership';
 import type { AuthUser } from '../types/auth';
 
 export class ReportService {
-  async getMonthlyReport(month: number, year: number, user: AuthUser, productId?: string, startDate?: string, endDate?: string, ownerId?: string) {
+  async getMonthlyReport(month: number, year: number, user: AuthUser, productId?: string, startDate?: string, endDate?: string, storeId?: string) {
     let start: Date;
     let end: Date;
 
@@ -17,11 +17,11 @@ export class ReportService {
       end = new Date(year, month, 0, 23, 59, 59, 999);
     }
 
-    const matchStage: any = scopeFilter(user, { activityDate: { $gte: start, $lte: end } });
+    const matchStage: any = storeFilter(user, { activityDate: { $gte: start, $lte: end } });
     if (productId) matchStage.productId = new mongoose.Types.ObjectId(productId);
     // Admins may scope a report to a specific owner; non-admins are already
-    // restricted to their own data by scopeFilter.
-    if (ownerId && user.role === 'admin') matchStage.ownerId = new mongoose.Types.ObjectId(ownerId);
+    // restricted to their own data by storeFilter.
+    if (storeId && user.role === 'admin') matchStage.storeId = new mongoose.Types.ObjectId(storeId);
 
     const activities = await Activity.find(matchStage).populate('productId').populate('versionId', 'label author').sort({ activityDate: -1 });
 
@@ -65,11 +65,11 @@ export class ReportService {
     end: Date,
     user: AuthUser,
     productId?: string,
-    ownerId?: string
+    storeId?: string
   ): Promise<Map<string, { features: number; improvements: number; bugFixes: number }>> {
-    const match: any = scopeFilter(user, { activityDate: { $gte: start, $lte: end } });
+    const match: any = storeFilter(user, { activityDate: { $gte: start, $lte: end } });
     if (productId) match.productId = new mongoose.Types.ObjectId(productId);
-    if (ownerId && user.role === 'admin') match.ownerId = new mongoose.Types.ObjectId(ownerId);
+    if (storeId && user.role === 'admin') match.storeId = new mongoose.Types.ObjectId(storeId);
 
     const rows = await Activity.aggregate([
       { $match: match },
@@ -131,13 +131,13 @@ export class ReportService {
     return results;
   }
 
-  async getAnnualReport(year: number, user: AuthUser, productId?: string, ownerId?: string) {
+  async getAnnualReport(year: number, user: AuthUser, productId?: string, storeId?: string) {
     const months = [];
     let totalFeatures = 0, totalImprovements = 0, totalBugFixes = 0;
 
     const rangeStart = new Date(Date.UTC(year, 0, 1));
     const rangeEnd = new Date(Date.UTC(year, 12, 0, 23, 59, 59, 999));
-    const counts = await this.groupByMonthAndType(rangeStart, rangeEnd, user, productId, ownerId);
+    const counts = await this.groupByMonthAndType(rangeStart, rangeEnd, user, productId, storeId);
 
     for (let m = 1; m <= 12; m++) {
       const bucket = counts.get(`${year}-${m}`) || { features: 0, improvements: 0, bugFixes: 0 };

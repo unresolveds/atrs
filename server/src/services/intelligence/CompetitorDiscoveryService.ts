@@ -26,7 +26,7 @@ export class CompetitorDiscoveryService {
    */
   static async autoDiscover(
     productId: string,
-    ownerId: string,
+    storeId: string,
   ): Promise<{
     added: unknown[];
     suggestions: DiscoveredCompetitor[];
@@ -42,7 +42,7 @@ export class CompetitorDiscoveryService {
     const added = confident.length
       ? await CompetitorIntelService.addDiscovered(
           productId,
-          ownerId,
+          storeId,
           confident.map((c) => c.slug),
         )
       : [];

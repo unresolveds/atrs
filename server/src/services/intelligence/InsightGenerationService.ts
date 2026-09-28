@@ -23,14 +23,14 @@ export class InsightGenerationService {
   /**
    * Generates the full insight feed for a product.
    *
-   * `ownerId` is accepted for signature compatibility but no longer needed —
+   * `storeId` is accepted for signature compatibility but no longer needed —
    * ownership is resolved from the product record inside the signal context, which
    * removes a class of bug where a caller passed the requesting admin's id instead
    * of the owner's.
    */
   static async generateInsights(
     productId: string | mongoose.Types.ObjectId,
-    _ownerId?: string | mongoose.Types.ObjectId,
+    _storeId?: string | mongoose.Types.ObjectId,
     opts?: { signals?: ISignal[]; context?: SignalContext },
   ): Promise<IInsight[]> {
     const result = await InsightEngine.generate(productId, opts);
@@ -46,7 +46,7 @@ export class InsightGenerationService {
    */
   static async generateHealthSummary(
     productId: string | mongoose.Types.ObjectId,
-    _ownerId?: string | mongoose.Types.ObjectId,
+    _storeId?: string | mongoose.Types.ObjectId,
   ): Promise<IInsight | null> {
     const result = await InsightEngine.generate(productId);
     return result.insights.find((i) => i.type === 'stability') ?? result.insights[0] ?? null;
@@ -55,7 +55,7 @@ export class InsightGenerationService {
   /** Kept for callers that specifically wanted the defect-trend narrative. */
   static async generateBugTrendInsight(
     productId: string | mongoose.Types.ObjectId,
-    _ownerId?: string | mongoose.Types.ObjectId,
+    _storeId?: string | mongoose.Types.ObjectId,
   ): Promise<IInsight | null> {
     const result = await InsightEngine.generate(productId);
     return result.insights.find((i) => i.type === 'stability') ?? null;

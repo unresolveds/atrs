@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IProduct extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   name: string;
   slug: string;
   description?: string;
@@ -35,7 +35,7 @@ export interface IProduct extends Document {
 
 const ProductSchema: Schema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     name: { type: String, required: true },
     // Slug is unique per owner (see compound index below), not globally — two
     // different owners may each have a product that slugifies to the same value.
@@ -71,7 +71,7 @@ const ProductSchema: Schema = new Schema(
 );
 
 // Slug is unique within an owner's namespace, not globally.
-ProductSchema.index({ ownerId: 1, slug: 1 }, { unique: true });
+ProductSchema.index({ storeId: 1, slug: 1 }, { unique: true });
 // Indexes for filter queries.
 ProductSchema.index({ status: 1 });
 ProductSchema.index({ category: 1 });

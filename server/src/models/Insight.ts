@@ -25,7 +25,7 @@ export type InsightStatus = 'new' | 'viewed' | 'acknowledged' | 'dismissed' | 'a
 
 export interface IInsight extends Document {
   productId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   type: InsightType;
   severity: InsightSeverity;
   title: string;
@@ -84,7 +84,7 @@ const EvidenceSchema = new Schema(
 const InsightSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     type: {
       type: String,
       enum: [
@@ -135,7 +135,7 @@ const InsightSchema = new Schema(
 );
 
 // Indexes
-InsightSchema.index({ ownerId: 1, status: 1 });
+InsightSchema.index({ storeId: 1, status: 1 });
 // One live insight per concern per product — the upsert key for regeneration.
 // Sparse so the pre-existing rows without a fingerprint don't collide on null.
 InsightSchema.index({ productId: 1, fingerprint: 1 }, { unique: true, sparse: true });

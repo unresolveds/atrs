@@ -35,7 +35,7 @@ export type RecommendationSource =
 
 export interface IRecommendation extends Document {
   productId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   
   title: string;
   description: string;
@@ -99,7 +99,7 @@ export interface IRecommendation extends Document {
 const RecommendationSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     
     title: { type: String, required: true },
     description: { type: String, required: true },
@@ -153,8 +153,8 @@ const RecommendationSchema = new Schema(
   { timestamps: true }
 );
 
-RecommendationSchema.index({ ownerId: 1, status: 1, priority: 1 });
-RecommendationSchema.index({ ownerId: 1, category: 1 });
+RecommendationSchema.index({ storeId: 1, status: 1, priority: 1 });
+RecommendationSchema.index({ storeId: 1, category: 1 });
 RecommendationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const Recommendation = mongoose.model<IRecommendation>('Recommendation', RecommendationSchema);

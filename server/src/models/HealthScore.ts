@@ -6,10 +6,10 @@ export interface IHealthScore extends Document {
    * Owner of the product this score belongs to.
    *
    * Added because the portfolio endpoint aggregated `HealthScore` documents with
-   * `$match: { ownerId }` against a schema that had no such field — so the match
+   * `$match: { storeId }` against a schema that had no such field — so the match
    * never hit and the portfolio widget silently reported zeros for every user.
    */
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   overallScore: number;
   breakdown: {
     bugHealth: number;
@@ -37,7 +37,7 @@ export interface IHealthScore extends Document {
 const HealthScoreSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     overallScore: { type: Number, required: true, min: 0, max: 100 },
     breakdown: {
       bugHealth: { type: Number, required: true },

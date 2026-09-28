@@ -331,7 +331,7 @@ export class RoadmapEngine {
       { productId: new mongoose.Types.ObjectId(ctx.productId), fingerprint: candidate.fingerprint },
       {
         $set: {
-          ownerId: new mongoose.Types.ObjectId(ctx.ownerId),
+          storeId: new mongoose.Types.ObjectId(ctx.storeId),
           title,
           description,
           rationale: candidate.rationale,

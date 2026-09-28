@@ -2,7 +2,7 @@ import { Issue, IIssue } from '../models/Issue';
 import { Product } from '../models/Product';
 import { AuditLogService } from './AuditLogService';
 import { notificationManager } from './NotificationManager';
-import { scopeFilter, assertOwner } from '../utils/ownership';
+import { storeFilter, assertStoreAccess } from '../utils/ownership';
 import { escapeHtml, plainTextToSafeHtml } from '../utils/html';
 import createHttpError from '../utils/httpError';
 import type { AuthUser } from '../types/auth';
@@ -14,12 +14,12 @@ const RESOLVED_STATUSES = ['resolved', 'closed'];
 export class IssueService {
   async createIssue(data: any, user: AuthUser): Promise<IIssue> {
     const product = await Product.findById(data.productId);
-    assertOwner(product, user);
+    assertStoreAccess(product, user);
     // Stamp the resolution time when an issue is filed already resolved/closed.
     if (RESOLVED_STATUSES.includes(data.status) && !data.resolvedAt) {
       data.resolvedAt = new Date();
     }
-    const issue = new Issue({ ...data, ownerId: product!.ownerId });
+    const issue = new Issue({ ...data, storeId: product!.storeId });
     await issue.save();
     await auditLogService.logEvent('CREATE', 'ISSUE', issue._id.toString(), issue.title, `Reported issue "${issue.title}"`, { id: user.id, name: user.name });
     return issue;
@@ -29,7 +29,7 @@ export class IssueService {
     // With a productId, return that product's issues. Without one, return every
     // issue the user owns and populate the product so the dashboard can group
     // and link them.
-    const filter = productId ? scopeFilter(user, { productId }) : scopeFilter(user);
+    const filter = productId ? storeFilter(user, { productId }) : storeFilter(user);
     const query = Issue.find(filter).sort({ createdAt: -1 });
     if (!productId) query.populate('productId', 'name slug icon');
     return await query;
@@ -40,21 +40,21 @@ export class IssueService {
    * products (admins see everyone's). Powers the Review queue + nav badge.
    */
   async getPendingReview(user: AuthUser): Promise<IIssue[]> {
-    return await Issue.find(scopeFilter(user, { source: 'public', needsReview: true }))
+    return await Issue.find(storeFilter(user, { source: 'public', needsReview: true }))
       .sort({ createdAt: -1 })
       .populate('productId', 'name slug icon');
   }
 
   async getIssueById(id: string, user: AuthUser): Promise<IIssue | null> {
     const issue = await Issue.findById(id);
-    assertOwner(issue, user);
+    assertStoreAccess(issue, user);
     return issue;
   }
 
   async updateIssue(id: string, data: any, user: AuthUser): Promise<IIssue | null> {
     const existing = await Issue.findById(id);
-    assertOwner(existing, user);
-    delete data.ownerId;
+    assertStoreAccess(existing, user);
+    delete data.storeId;
     // Keep resolvedAt in sync with the status transition.
     if (data.status) {
       const nowResolved = RESOLVED_STATUSES.includes(data.status);
@@ -71,7 +71,7 @@ export class IssueService {
 
   async deleteIssue(id: string, user: AuthUser): Promise<IIssue | null> {
     const existing = await Issue.findById(id);
-    assertOwner(existing, user);
+    assertStoreAccess(existing, user);
     const issue = await Issue.findByIdAndDelete(id);
     if (issue) {
       await auditLogService.logEvent('DELETE', 'ISSUE', issue._id.toString(), issue.title, `Deleted issue "${issue.title}"`, { id: user.id, name: user.name });
@@ -107,7 +107,7 @@ export class IssueService {
 
     const issue = await Issue.create({
       productId,
-      ownerId: product.ownerId,
+      storeId: product.storeId,
       title: escapeHtml(data.title.trim()).slice(0, 200),
       description: data.description ? plainTextToSafeHtml(data.description.trim()) : '',
       versionLabel: data.versionLabel ? escapeHtml(data.versionLabel.trim()).slice(0, 60) : '',
@@ -122,8 +122,9 @@ export class IssueService {
 
     // System-actor audit entry (no AuthUser for anonymous reports).
     await auditLogService.logEvent('CREATE', 'ISSUE', issue._id.toString(), issue.title, 'Public issue report (awaiting review)');
-    // Live nudge to the owner if they're connected.
-    notificationManager.sendToUser(product.ownerId.toString(), 'issue-reported', {
+    // Live nudge to whoever from the store is connected — a public report is
+    // the store's news, not one nominated person's.
+    notificationManager.sendToStore(product.storeId.toString(), 'issue-reported', {
       id: issue._id.toString(),
       productId,
       productName: product.name,

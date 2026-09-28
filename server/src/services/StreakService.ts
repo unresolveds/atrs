@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { requireStoreId } from '../utils/ownership';
 import { DailyLog, IDailyLog } from '../models/DailyLog';
 import type { AuthUser } from '../types/auth';
 
@@ -51,7 +52,7 @@ function clampOffset(tzOffsetMinutes: number): number {
 export class StreakService {
   /** Adds one journal entry for the caller ("what did you work on?"). */
   public async logToday(note: string, user: AuthUser): Promise<IDailyLog> {
-    return DailyLog.create({ ownerId: user.id, note });
+    return DailyLog.create({ storeId: requireStoreId(user), note });
   }
 
   /**
@@ -61,7 +62,7 @@ export class StreakService {
    */
   public async deleteLog(id: string, user: AuthUser): Promise<IDailyLog | null> {
     const log = await DailyLog.findById(id);
-    if (!log || log.ownerId.toString() !== user.id) return null;
+    if (!log || log.storeId.toString() !== user.id) return null;
     await log.deleteOne();
     return log;
   }
@@ -74,10 +75,10 @@ export class StreakService {
   public async getLoggingStreak(user: AuthUser, tzOffsetMinutes: number): Promise<StreakStats> {
     const offset = clampOffset(tzOffsetMinutes);
     const tz = tzFromOffset(offset);
-    const ownerId = new mongoose.Types.ObjectId(user.id);
+    const storeId = new mongoose.Types.ObjectId(user.id);
 
     const rows: { _id: string; count: number }[] = await DailyLog.aggregate([
-      { $match: { ownerId } },
+      { $match: { storeId } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: tz } },
@@ -121,7 +122,7 @@ export class StreakService {
     // Today's entries (shown on the card). Midnight in the caller's timezone,
     // expressed as a UTC instant: today's date string + the flipped offset.
     const startOfTodayUtc = new Date(new Date(`${today}T00:00:00Z`).getTime() + offset * 60000);
-    const todayNotes = await DailyLog.find({ ownerId, createdAt: { $gte: startOfTodayUtc } })
+    const todayNotes = await DailyLog.find({ storeId, createdAt: { $gte: startOfTodayUtc } })
       .sort({ createdAt: -1 })
       .limit(5)
       .select('note createdAt')

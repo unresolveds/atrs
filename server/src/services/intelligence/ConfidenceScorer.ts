@@ -91,16 +91,16 @@ export class ConfidenceScorer {
    */
   static async historicalAccuracy(
     productId: string | mongoose.Types.ObjectId,
-    ownerId: string | mongoose.Types.ObjectId,
+    storeId: string | mongoose.Types.ObjectId,
   ): Promise<{ score: number; sampleSize: number }> {
     const [insightFeedback, recFeedback, recOutcomes] = await Promise.all([
-      Insight.find({ ownerId, userFeedback: { $exists: true, $ne: null } })
+      Insight.find({ storeId, userFeedback: { $exists: true, $ne: null } })
         .select('userFeedback productId')
         .lean(),
-      Recommendation.find({ ownerId, userFeedback: { $exists: true, $ne: null } })
+      Recommendation.find({ storeId, userFeedback: { $exists: true, $ne: null } })
         .select('userFeedback productId')
         .lean(),
-      Recommendation.find({ ownerId, status: { $in: ['accepted', 'implemented', 'measured', 'dismissed'] } })
+      Recommendation.find({ storeId, status: { $in: ['accepted', 'implemented', 'measured', 'dismissed'] } })
         .select('status productId')
         .lean(),
     ]);
@@ -158,11 +158,11 @@ export class ConfidenceScorer {
   /** Composes the final confidence with a human-readable account of the arithmetic. */
   static async score(
     productId: string | mongoose.Types.ObjectId,
-    ownerId: string | mongoose.Types.ObjectId,
+    storeId: string | mongoose.Types.ObjectId,
     input: ConfidenceInput,
   ): Promise<ConfidenceBreakdown> {
     const dataDensity = this.dataDensity(input.signals);
-    const { score: historicalAccuracy, sampleSize } = await this.historicalAccuracy(productId, ownerId);
+    const { score: historicalAccuracy, sampleSize } = await this.historicalAccuracy(productId, storeId);
     const groundedness = this.groundedness(input);
 
     const confidence = round(

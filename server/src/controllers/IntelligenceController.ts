@@ -29,7 +29,7 @@ import { Product, type IProduct } from '../models/Product';
  *
  * Every handler routes through this so the admin-bypass rule lives in exactly one
  * place. It returns the product rather than a boolean because handlers need
- * `product.ownerId` — several previously passed `req.user.id` as the owner, which
+ * `product.storeId` — several previously passed `req.user.id` as the owner, which
  * stamped an admin's id onto another user's generated records.
  */
 async function resolveProduct(req: Request, res: Response): Promise<IProduct | null> {
@@ -41,7 +41,7 @@ async function resolveProduct(req: Request, res: Response): Promise<IProduct | n
   }
 
   const query: Record<string, unknown> = { _id: productId };
-  if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+  if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
   const product = await Product.findOne(query);
   if (!product) {
@@ -64,7 +64,7 @@ export const getHealthScore = async (req: Request, res: Response, next: NextFunc
     // trend comparison could never find a genuinely older score to compare against.
     const score = await HealthScoreService.getScore(
       String(product._id),
-      product.ownerId.toString(),
+      product.storeId.toString(),
       period,
       { force: req.query.refresh === 'true' },
     );
@@ -146,7 +146,7 @@ export const updateInsight = async (req: Request, res: Response, next: NextFunct
     const { status, userFeedback, userNote } = req.body ?? {};
 
     const query: Record<string, unknown> = { _id: insightId };
-    if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+    if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
     // Only set what was sent. The original spread all three unconditionally, so a
     // request updating just `status` also wrote `userFeedback: undefined`, wiping
@@ -176,7 +176,7 @@ export const updateInsight = async (req: Request, res: Response, next: NextFunct
 export const deleteInsight = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const query: Record<string, unknown> = { _id: req.params.insightId };
-    if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+    if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
     const result = await Insight.deleteOne(query);
     if (result.deletedCount === 0) {
@@ -193,7 +193,7 @@ export const deleteInsight = async (req: Request, res: Response, next: NextFunct
 export const deleteRoadmapItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const query: Record<string, unknown> = { _id: req.params.itemId };
-    if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+    if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
     const item = await RoadmapItem.findOne(query);
     if (!item) {
@@ -274,7 +274,7 @@ export const updateRoadmapItem = async (req: Request, res: Response, next: NextF
       req.body ?? {};
 
     const query: Record<string, unknown> = { _id: itemId };
-    if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+    if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
     const item = await RoadmapItem.findOne(query);
     if (!item) {
@@ -351,7 +351,7 @@ export const updateRecommendation = async (req: Request, res: Response, next: Ne
     const { status, userFeedback, userNote, dismissReason } = req.body ?? {};
 
     const query: Record<string, unknown> = { _id: recommendationId };
-    if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+    if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
     const recommendation = await Recommendation.findOne(query);
     if (!recommendation) {
@@ -410,7 +410,7 @@ export const triggerAnalysis = async (req: Request, res: Response, next: NextFun
     if (!product) return;
 
     const productId = String(product._id);
-    const ownerId = product.ownerId.toString();
+    const storeId = product.storeId.toString();
     const category = req.body?.category as string | undefined;
 
     // Category-scoped runs back the interactive buttons; omitting the category runs
@@ -419,7 +419,7 @@ export const triggerAnalysis = async (req: Request, res: Response, next: NextFun
       case 'health':
         res.status(200).json({
           message: 'Health score recomputed',
-          result: await HealthScoreService.generateScore(productId, ownerId, 'weekly'),
+          result: await HealthScoreService.generateScore(productId, storeId, 'weekly'),
         });
         return;
 
@@ -457,7 +457,7 @@ export const triggerAnalysis = async (req: Request, res: Response, next: NextFun
       case 'recommendations':
         res.status(200).json({
           message: 'Recommendations regenerated',
-          result: await RecommendationService.generateRecommendations(productId, ownerId),
+          result: await RecommendationService.generateRecommendations(productId, storeId),
         });
         return;
 
@@ -487,7 +487,7 @@ export const getScorecard = async (req: Request, res: Response, next: NextFuncti
     const productId = String(product._id);
 
     const [healthScore, insights, recommendations, signals] = await Promise.all([
-      HealthScoreService.getScore(productId, product.ownerId.toString(), 'weekly'),
+      HealthScoreService.getScore(productId, product.storeId.toString(), 'weekly'),
       Insight.find({ productId, status: { $in: ['new', 'viewed'] } }).sort({ generatedAt: -1 }).limit(5),
       Recommendation.find({ productId, status: { $in: ['generated', 'reviewed', 'accepted'] } })
         .sort({ impactScore: -1 })
@@ -658,10 +658,10 @@ export const getCompetitiveMatrix = async (req: Request, res: Response, next: Ne
 // GET /api/intelligence/config
 export const getConfig = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ownerId = req.user!.id as string;
-    let config = await IntelligenceConfig.findOne({ ownerId });
+    const storeId = req.user!.id as string;
+    let config = await IntelligenceConfig.findOne({ storeId });
     if (!config) {
-      config = await IntelligenceConfig.create({ ownerId });
+      config = await IntelligenceConfig.create({ storeId });
     }
     res.status(200).json(config);
   } catch (error) {
@@ -672,11 +672,11 @@ export const getConfig = async (req: Request, res: Response, next: NextFunction)
 // PATCH /api/intelligence/config
 export const updateConfig = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ownerId = req.user!.id as string;
+    const storeId = req.user!.id as string;
     const updates = req.body ?? {};
 
     const config = await IntelligenceConfig.findOneAndUpdate(
-      { ownerId },
+      { storeId },
       { $set: updates },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     );
@@ -708,14 +708,14 @@ export const getAiStatus = async (_req: Request, res: Response, next: NextFuncti
 // GET /api/intelligence/portfolio
 export const getPortfolioHealth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ownerId = req.user!.id as string;
+    const storeId = req.user!.id as string;
 
     // Scope by the caller's products rather than by a field on HealthScore. The
-    // original matched `HealthScore.ownerId`, which the schema did not define, so the
+    // original matched `HealthScore.storeId`, which the schema did not define, so the
     // aggregation matched nothing and this endpoint returned all-zeros for every
-    // user. `ownerId` now exists on the model, but deriving the product set here also
+    // user. `storeId` now exists on the model, but deriving the product set here also
     // covers scores written before that field was added.
-    const products = await Product.find({ ownerId }).select('_id name').lean();
+    const products = await Product.find({ storeId }).select('_id name').lean();
 
     if (products.length === 0) {
       res.status(200).json({
@@ -835,7 +835,7 @@ export const syncChurn = async (req: Request, res: Response, next: NextFunction)
     if (!product) return;
 
     const withKeys = await Product.findById(product._id)
-      .select('+freemiusPublicKey +freemiusSecretKey freemiusProductId name ownerId');
+      .select('+freemiusPublicKey +freemiusSecretKey freemiusProductId name storeId');
     if (!withKeys || !resolveCredentials(withKeys)) {
       res.status(400).json({ message: 'This product is not connected to Freemius.' });
       return;

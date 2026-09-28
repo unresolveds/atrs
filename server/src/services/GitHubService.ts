@@ -2,7 +2,7 @@ import { User } from '../models/User';
 import { Product } from '../models/Product';
 import { Version } from '../models/Version';
 import { AuditLogService } from './AuditLogService';
-import { assertOwner } from '../utils/ownership';
+import { assertStoreAccess } from '../utils/ownership';
 import { encryptSecret, decryptSecret } from '../utils/crypto';
 import { getAuthenticatedUser, listReleases, parseRepo } from '../utils/github';
 import createHttpError from '../utils/httpError';
@@ -82,7 +82,7 @@ export class GitHubService {
    */
   async syncReleases(productId: string, user: AuthUser): Promise<ReleaseSyncResult> {
     const product = await Product.findById(productId);
-    assertOwner(product, user); // 404s for non-owners; admins pass
+    assertStoreAccess(product, user); // 404s for non-owners; admins pass
 
     const parsed = parseRepo(product!.githubUrl);
     if (!parsed) {
@@ -125,7 +125,7 @@ export class GitHubService {
         await Version.create({
           ...fields,
           productId,
-          ownerId: product!.ownerId,
+          storeId: product!.storeId,
           source: 'github',
           externalId,
         });

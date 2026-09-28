@@ -51,7 +51,7 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
   try {
     const { reassignTo } = req.query as { reassignTo?: string };
     if (reassignTo) {
-      await userService.reassignOwnership(req.params.id as string, reassignTo);
+      await userService.transferStoreOwnership(req.params.id as string, reassignTo);
     }
     res.status(200).json(await userService.deleteUser(req.params.id as string));
   } catch (error) {
@@ -85,10 +85,10 @@ export const deleteUserStream = async (req: Request, res: Response) => {
   await runStreamJob(req, res, (ctx) => userService.deleteUserCascade(id, req.user!, ctx));
 };
 
-export const reassignOwnership = async (req: Request, res: Response, next: NextFunction) => {
+export const transferStoreOwnership = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { toUserId } = req.body as { toUserId: string };
-    const result = await userService.reassignOwnership(req.params.id as string, toUserId);
+    const result = await userService.transferStoreOwnership(req.params.id as string, toUserId);
     res.status(200).json(result);
   } catch (error) {
     next(error);

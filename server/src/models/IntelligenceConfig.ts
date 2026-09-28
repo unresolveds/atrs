@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IIntelligenceConfig extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   autoAnalysis: boolean;
   analysisFrequency: 'daily' | 'weekly' | 'monthly';
   analysisHour: number;
@@ -35,7 +35,7 @@ export interface IIntelligenceConfig extends Document {
 
 const IntelligenceConfigSchema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, unique: true },
     autoAnalysis: { type: Boolean, default: false },
     analysisFrequency: { type: String, enum: ['daily', 'weekly', 'monthly'], default: 'weekly' },
     analysisHour: { type: Number, default: 3 }, // 3 AM

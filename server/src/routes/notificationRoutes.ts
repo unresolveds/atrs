@@ -34,7 +34,7 @@ router.get('/subscribe', requireAuthSSE, requireActive, (req: Request, res: Resp
   req.socket.setTimeout(0);
 
   // Add client handle to notification dispatcher
-  const unsubscribe = notificationManager.addClient(user.id, user.isRoot, res, user.role === 'admin');
+  const unsubscribe = notificationManager.addClient(user.id, user.isRoot, res, user.role === 'admin', user.storeId);
 
   // Unregister user when client closes the socket connection
   req.on('close', () => {

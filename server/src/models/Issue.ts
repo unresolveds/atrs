@@ -4,7 +4,7 @@ export type IssueStatus = 'open' | 'in-progress' | 'resolved' | 'closed';
 export type IssueSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export interface IIssue extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   title: string;
   description?: string;
@@ -37,7 +37,7 @@ export interface IIssue extends Document {
 
 const IssueSchema: Schema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ICompetitor extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   name: string;
   url?: string;
@@ -17,7 +17,7 @@ export interface ICompetitor extends Document {
 
 const CompetitorSchema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
     name: { type: String, required: true, trim: true },
     url: { type: String, trim: true },

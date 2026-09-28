@@ -148,7 +148,7 @@ export const requireAuthSSE = (req: Request, res: Response, next: NextFunction) 
 export const requireActive = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Authentication required' });
-    const account = await User.findById(req.user.id).select('name email status role isRoot passwordChangedAt');
+    const account = await User.findById(req.user.id).select('name email status role isRoot passwordChangedAt storeId storeRole');
     if (!account) return res.status(401).json({ message: 'Account no longer exists' });
     if (account.status !== 'active') {
       return res.status(403).json({ message: 'Account is not active' });
@@ -165,6 +165,10 @@ export const requireActive = async (req: Request, res: Response, next: NextFunct
     req.user.isRoot = account.isRoot;
     req.user.name = account.name;
     req.user.email = account.email;
+    // Tenancy comes from the database, not the token, so a membership change
+    // (or removal) applies to the very next request.
+    req.user.storeId = account.storeId ? String(account.storeId) : undefined;
+    req.user.storeRole = account.storeRole;
     next();
   } catch (error) {
     next(error);

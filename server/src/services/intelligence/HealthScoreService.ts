@@ -42,7 +42,7 @@ export class HealthScoreService {
    */
   static async getScore(
     productId: string | mongoose.Types.ObjectId,
-    ownerId: string | mongoose.Types.ObjectId,
+    storeId: string | mongoose.Types.ObjectId,
     period: HealthPeriod = 'weekly',
     opts?: { force?: boolean },
   ): Promise<IHealthScore> {
@@ -52,18 +52,18 @@ export class HealthScoreService {
         return cached;
       }
     }
-    return this.generateScore(productId, ownerId, period);
+    return this.generateScore(productId, storeId, period);
   }
 
   /** Computes and persists a fresh score. */
   static async generateScore(
     productId: string | mongoose.Types.ObjectId,
-    ownerId: string | mongoose.Types.ObjectId,
+    storeId: string | mongoose.Types.ObjectId,
     period: HealthPeriod = 'weekly',
   ): Promise<IHealthScore> {
-    let config = await IntelligenceConfig.findOne({ ownerId });
+    let config = await IntelligenceConfig.findOne({ storeId });
     if (!config) {
-      config = new IntelligenceConfig({ ownerId });
+      config = new IntelligenceConfig({ storeId });
       await config.save();
     }
 
@@ -117,7 +117,7 @@ export class HealthScoreService {
 
     return HealthScore.create({
       productId,
-      ownerId,
+      storeId,
       overallScore,
       breakdown,
       metrics: {

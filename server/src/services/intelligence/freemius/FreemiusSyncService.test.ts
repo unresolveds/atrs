@@ -33,7 +33,7 @@ vi.mock('../../../utils/crypto', () => ({ unsealSecret: (v: string) => v }));
 const { FreemiusSyncService } = await import('./FreemiusSyncService');
 
 const product: any = {
-  _id: 'p1', ownerId: 'o1', name: 'Test',
+  _id: 'p1', storeId: 'o1', name: 'Test',
   freemiusProductId: '1', freemiusPublicKey: 'pk', freemiusSecretKey: 'sk',
 };
 

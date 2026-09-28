@@ -11,7 +11,7 @@ import { Activity } from '../models/Activity';
 import { Version } from '../models/Version';
 import { ProductMarketing } from '../models/ProductMarketing';
 import { deleteMediaFiles } from '../utils/fileUtils';
-import { scopeFilter, assertOwner } from '../utils/ownership';
+import { storeFilter, assertStoreAccess, requireStoreId} from '../utils/ownership';
 import { parseLimit, parsePage } from '../utils/pagination';
 import createHttpError from '../utils/httpError';
 import { escapeRegex } from '../utils/sanitize';
@@ -39,12 +39,12 @@ export class ProductService {
   }
 
   /**
-   * Builds a slug for `name` that is unique within `ownerId`'s products.
+   * Builds a slug for `name` that is unique within `storeId`'s products.
    * `excludeId` skips the product being updated so it doesn't collide with itself.
    */
-  private async uniqueSlugForOwner(name: string, ownerId: string, excludeId?: string): Promise<string> {
+  private async uniqueSlugForOwner(name: string, storeId: string, excludeId?: string): Promise<string> {
     const base = baseSlug(name);
-    const filter: any = { ownerId, slug: { $regex: `^${base}(-\\d+)?$` } };
+    const filter: any = { storeId, slug: { $regex: `^${base}(-\\d+)?$` } };
     if (excludeId) filter._id = { $ne: excludeId };
     const taken = new Set<string>(await Product.find(filter).distinct('slug'));
     return disambiguateSlug(base, taken);
@@ -53,12 +53,12 @@ export class ProductService {
   async createProduct(data: any, user: AuthUser): Promise<IProduct> {
     // uniqueSlugForOwner reads-then-writes, so two concurrent creates for the
     // same owner+name can compute the same slug and collide on the
-    // { ownerId, slug } unique index. Retry a few times (recomputing the slug,
+    // { storeId, slug } unique index. Retry a few times (recomputing the slug,
     // which now sees the winner) before giving up with a clean 409.
     for (let attempt = 0; attempt < 4; attempt++) {
       const slug = await this.uniqueSlugForOwner(data.name, user.id);
       try {
-        const product = await this.repository.create({ ...data, slug, ownerId: user.id });
+        const product = await this.repository.create({ ...data, slug, storeId: requireStoreId(user) });
         await auditLogService.logEvent('CREATE', 'PRODUCT', product._id.toString(), product.name, 'Added a new product', { id: user.id, name: user.name });
         return product;
       } catch (err: any) {
@@ -70,8 +70,8 @@ export class ProductService {
 
   async getProducts(query: any, user: AuthUser): Promise<any> {
     // Scope to the user's own products; admins are unrestricted and may
-    // additionally narrow by a specific owner via ?ownerId.
-    const filter: any = scopeFilter(user);
+    // additionally narrow by a specific owner via ?storeId.
+    const filter: any = storeFilter(user);
     if (query.search) {
       filter.name = { $regex: escapeRegex(query.search), $options: 'i' };
     }
@@ -81,8 +81,8 @@ export class ProductService {
     if (query.status) {
       filter.status = query.status;
     }
-    if (query.ownerId && user.role === 'admin') {
-      filter.ownerId = query.ownerId;
+    if (query.storeId && user.role === 'admin') {
+      filter.storeId = query.storeId;
     }
     const options = {
       page: parsePage(query.page),
@@ -95,7 +95,7 @@ export class ProductService {
     const product = await this.repository.findById(id);
     if (!product) throw createHttpError(404, 'Product not found');
     // Non-admins may only view their own products (404 so ids can't be probed).
-    assertOwner(product, user);
+    assertStoreAccess(product, user);
     return product;
   }
 
@@ -134,7 +134,7 @@ export class ProductService {
    */
   async getStaleProducts(user: AuthUser, days: number): Promise<{ days: number; products: any[] }> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const products = await Product.find(scopeFilter(user))
+    const products = await Product.find(storeFilter(user))
       .select('name slug icon category status updatedAt')
       .lean();
     if (products.length === 0) return { days, products: [] };
@@ -170,12 +170,12 @@ export class ProductService {
   async updateProduct(id: string, data: any, user: AuthUser): Promise<IProduct | null> {
     const existing = await this.repository.findById(id);
     if (!existing) throw createHttpError(404, 'Product not found');
-    if (user.role !== 'admin' && existing.ownerId.toString() !== user.id) {
+    if (user.role !== 'admin' && existing.storeId.toString() !== user.id) {
       throw createHttpError(403, 'Forbidden: You do not have permission to edit this product');
     }
-    delete data.ownerId; // ownership is not editable through this path
+    delete data.storeId; // ownership is not editable through this path
     if (data.name) {
-      data.slug = await this.uniqueSlugForOwner(data.name, existing!.ownerId.toString(), id);
+      data.slug = await this.uniqueSlugForOwner(data.name, existing!.storeId.toString(), id);
     }
     const product = await this.repository.update(id, data);
     if (product) {
@@ -379,7 +379,7 @@ export class ProductService {
   async wpOrgPreview(username: string, user: AuthUser): Promise<any[]> {
     const plugins = await this.fetchWpOrgPlugins(username);
     const existingSlugs = await Product.find({
-      ownerId: user.id,
+      storeId: requireStoreId(user),
       wpOrgSlug: { $in: plugins.map((p: any) => p.slug) },
     }).distinct('wpOrgSlug');
 
@@ -410,7 +410,7 @@ export class ProductService {
     const resolved = (await Promise.all(slugs.map((s) => this.fetchWpOrgPluginBySlug(s)))).filter(Boolean);
 
     const existingSlugs = await Product.find({
-      ownerId: user.id,
+      storeId: requireStoreId(user),
       wpOrgSlug: { $in: resolved.map((p: any) => p.slug) },
     }).distinct('wpOrgSlug');
 
@@ -499,7 +499,7 @@ export class ProductService {
           wpReadme: readme,
         };
 
-        const existing = await Product.findOne({ ownerId: user.id, wpOrgSlug: plugin.slug });
+        const existing = await Product.findOne({ storeId: requireStoreId(user), wpOrgSlug: plugin.slug });
         let product: any;
         if (existing) {
           emit({ ...pctx, type: 'info', step: 'db-sync', message: `Updating existing product in database...` });
@@ -536,7 +536,7 @@ export class ProductService {
               // Brand new version — insert.
               toInsert.push({
                 productId: product._id,
-                ownerId: product.ownerId,
+                storeId: product.storeId,
                 label: tag.label,
                 notes: tag.notes,
                 status: 'released',
@@ -677,7 +677,7 @@ export class ProductService {
                   const needsReview = item.confidence !== 'high';
                   toInsertActs.push({
                     productId: product._id,
-                    ownerId: product.ownerId,
+                    storeId: product.storeId,
                     type: item.type,
                     title: item.title,
                     shortDescription: IMPORTED_CHANGELOG_DESC,
@@ -770,7 +770,7 @@ export class ProductService {
   async deleteProduct(id: string, user: AuthUser): Promise<IProduct | null> {
     const existing = await this.repository.findById(id);
     if (!existing) throw createHttpError(404, 'Product not found');
-    if (user.role !== 'admin' && existing.ownerId.toString() !== user.id) {
+    if (user.role !== 'admin' && existing.storeId.toString() !== user.id) {
       throw createHttpError(403, 'Forbidden: You do not have permission to delete this product');
     }
 

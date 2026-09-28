@@ -69,7 +69,7 @@ export class MarketDataService {
     return await MarketSnapshot.create({
       subjectType: 'product',
       productId: product._id,
-      ownerId: product.ownerId,
+      storeId: product.storeId,
       wpOrgSlug: slug,
       ...this.snapshotFieldsFrom(info, currentWp),
       ranking: stats?.ranking ?? null,
@@ -111,7 +111,7 @@ export class MarketDataService {
       subjectType: 'competitor',
       competitorId: competitor._id,
       productId: competitor.productId,
-      ownerId: competitor.ownerId,
+      storeId: competitor.storeId,
       wpOrgSlug: slug,
       ...this.snapshotFieldsFrom(info, currentWp),
       capturedAt: new Date(),

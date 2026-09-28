@@ -2,6 +2,8 @@ import { Response } from 'express';
 
 export interface NotificationClient {
   userId: string;
+  /** The store this connection is scoped to, so store-wide events can be targeted. */
+  storeId?: string;
   isRoot: boolean;
   isAdmin: boolean;
   res: Response;
@@ -29,8 +31,14 @@ export class NotificationManager {
    * Registers a client connection for SSE updates.
    * Returns a cleanup function to invoke on socket close.
    */
-  public addClient(userId: string, isRoot: boolean, res: Response, isAdmin: boolean = false): () => void {
-    const client: NotificationClient = { userId, isRoot, isAdmin: isAdmin || isRoot, res };
+  public addClient(
+    userId: string,
+    isRoot: boolean,
+    res: Response,
+    isAdmin: boolean = false,
+    storeId?: string,
+  ): () => void {
+    const client: NotificationClient = { userId, storeId, isRoot, isAdmin: isAdmin || isRoot, res };
     this.clients.add(client);
     
     // Send initial handshake acknowledgement
@@ -59,6 +67,22 @@ export class NotificationManager {
   public sendToUser(userId: string, event: string, data: any) {
     for (const client of this.clients) {
       if (client.userId === userId) {
+        this.sendEventToClient(client, event, data);
+      }
+    }
+  }
+
+  /**
+   * Sends a real-time notification to everyone connected from one store.
+   *
+   * Used for events that belong to the store rather than to a person — a
+   * publicly reported issue, for instance, is news for whoever is around to
+   * act on it, not for one nominated owner.
+   */
+  public sendToStore(storeId: string, event: string, data: any) {
+    if (!storeId) return;
+    for (const client of this.clients) {
+      if (client.storeId === storeId) {
         this.sendEventToClient(client, event, data);
       }
     }

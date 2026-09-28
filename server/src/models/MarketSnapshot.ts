@@ -20,7 +20,7 @@ export interface IMarketSnapshot extends Document {
   productId?: mongoose.Types.ObjectId;
   /** Set when subjectType is 'competitor'. */
   competitorId?: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   wpOrgSlug: string;
 
   activeInstalls: number | null;
@@ -58,7 +58,7 @@ const MarketSnapshotSchema = new Schema(
     subjectType: { type: String, enum: ['product', 'competitor'], required: true },
     productId: { type: Schema.Types.ObjectId, ref: 'Product', index: true },
     competitorId: { type: Schema.Types.ObjectId, ref: 'Competitor', index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     wpOrgSlug: { type: String, required: true, index: true },
 
     activeInstalls: { type: Number, default: null },

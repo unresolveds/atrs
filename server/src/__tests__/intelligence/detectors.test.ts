@@ -36,7 +36,7 @@ const daysAgo = (n: number) => new Date(NOW.getTime() - n * DAY);
 function ctx(overrides: Partial<SignalContext>): SignalContext {
   return {
     productId: 'product-1',
-    ownerId: 'owner-1',
+    storeId: 'owner-1',
     now: NOW,
     product: {},
     issues: [],

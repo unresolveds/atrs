@@ -28,7 +28,7 @@ export interface IActivityItem {
 }
 
 export interface IActivity extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   type: ActivityType;
   title: string;
@@ -98,7 +98,7 @@ const ActivityItemSchema: Schema = new Schema(
 
 const ActivitySchema: Schema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
@@ -158,7 +158,7 @@ ActivitySchema.index({ activityDate: -1 });
 ActivitySchema.index({ productId: 1 });
 ActivitySchema.index({ type: 1 });
 // Compound index supporting owner-scoped trend/annual aggregations.
-ActivitySchema.index({ ownerId: 1, activityDate: 1, type: 1 });
+ActivitySchema.index({ storeId: 1, activityDate: 1, type: 1 });
 // Enforce one changelog entry per (product, import key) so a re-import or two
 // concurrent imports can never create duplicate entries — the DB rejects the
 // second insert. Partial so it only applies to imported entries (manual/AI

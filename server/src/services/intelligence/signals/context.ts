@@ -39,7 +39,7 @@ export interface CompetitorContext {
  */
 export interface SignalContext {
   productId: string;
-  ownerId: string;
+  storeId: string;
   product: IProduct;
   now: Date;
 
@@ -132,7 +132,7 @@ export async function buildSignalContext(
 
   return {
     productId: String(product._id),
-    ownerId: String(product.ownerId),
+    storeId: String(product.storeId),
     product,
     now,
     issues,

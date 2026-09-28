@@ -1,4 +1,5 @@
 import { User, UserRole, UserStatus, hashPassword } from '../models/User';
+import { Store } from '../models/Store';
 import { Product } from '../models/Product';
 import { Activity } from '../models/Activity';
 import { Version } from '../models/Version';
@@ -111,10 +112,14 @@ export class UserService {
   }
 
   /**
-   * Streaming cascade delete: removes every product the user owns (each with
-   * its activities, versions, marketing and uploaded assets), then any orphaned
-   * activities/versions/marketing still tagged to them, then the account
-   * itself. Emits progress so the admin sees each step in the live console.
+   * Streaming delete of a user and, when they are the last member, their store.
+   *
+   * Products belong to the store, not to the person, so removing a member must
+   * not take the store's data with them — their colleagues still need it. Only
+   * when the departing user is the sole remaining member does the store and
+   * everything in it go too. An owner who still has colleagues is refused:
+   * ownership has to be handed over first, because silently promoting someone
+   * or silently deleting a working store are both worse than an error message.
    */
   async deleteUserCascade(
     id: string,
@@ -124,11 +129,38 @@ export class UserService {
     const { emit, isCancelled } = ctx;
     const target = await this.getEditableUser(id); // throws on root / not-found
 
+    const storeId = target.storeId ? String(target.storeId) : null;
+    // Everyone else still in this store. Their work is the reason the cascade
+    // must not fire just because one person is leaving.
+    const remaining = storeId
+      ? await User.countDocuments({ storeId, _id: { $ne: target._id } })
+      : 0;
+
+    if (storeId && remaining > 0) {
+      if (target.storeRole === 'owner') {
+        throw createHttpError(
+          409,
+          `${target.name} owns a store with ${remaining} other member${remaining === 1 ? '' : 's'}. ` +
+          'Transfer ownership before deleting the account.',
+        );
+      }
+      // A member leaving: remove the account, leave the store's data alone.
+      emit({ type: 'info', step: 'start', message: `Removing "${target.name}" from the store...` });
+      await target.deleteOne();
+      emit({
+        type: 'success', step: 'user',
+        message: `✓ Account removed. The store's products and history are untouched.`,
+      });
+      return { productsDeleted: 0, errors: [] as string[], cancelled: false };
+    }
+
     emit({ type: 'info', step: 'start', message: `Deleting "${target.name}" and all of their data...` });
 
     const productService = new ProductService();
-    const products = await Product.find({ ownerId: id }, 'name').lean();
-    emit({ type: 'info', step: 'scan', message: `Found ${products.length} product(s) owned by this user` });
+    // Scoped to the store, not the person: a store's products are shared, and
+    // this path only runs when nobody is left to share them with.
+    const products = storeId ? await Product.find({ storeId }, 'name').lean() : [];
+    emit({ type: 'info', step: 'scan', message: `Found ${products.length} product(s) in this store` });
 
     let productsDeleted = 0;
     const errors: string[] = [];
@@ -152,7 +184,7 @@ export class UserService {
 
     if (!cancelled) {
       // Any activities still tagged to this user (e.g. product already gone).
-      const orphanActs = await Activity.find({ ownerId: id }, '_id').lean();
+      const orphanActs = storeId ? await Activity.find({ storeId }, '_id').lean() : [];
       if (orphanActs.length > 0) {
         emit({ type: 'info', step: 'orphans', message: `Removing ${orphanActs.length} orphaned activit${orphanActs.length !== 1 ? 'ies' : 'y'} & media...` });
         const activityService = new ActivityService();
@@ -161,8 +193,8 @@ export class UserService {
       }
 
       // Orphaned marketing docs: clean their media files, then the docs.
-      const orphanMkt = await ProductMarketing.find(
-        { ownerId: id },
+      const orphanMkt = !storeId ? [] : await ProductMarketing.find(
+        { storeId },
         'trailerVideo tutorialVideo thumbnailImage keyFeatures screenshots demos'
       ).lean();
       if (orphanMkt.length > 0) {
@@ -174,12 +206,12 @@ export class UserService {
           m.demos?.forEach((d: any) => urls.push(d.icon));
         }
         deleteMediaFiles(urls.filter(Boolean) as string[]);
-        await ProductMarketing.deleteMany({ ownerId: id });
+        await ProductMarketing.deleteMany({ storeId });
         emit({ type: 'success', step: 'orphans', message: `✓ Removed orphaned marketing data` });
       }
 
       // Orphaned version rows.
-      await Version.deleteMany({ ownerId: id });
+      await Version.deleteMany({ storeId });
 
       emit({ type: 'info', step: 'user', message: `Removing user account...` });
       await target.deleteOne();
@@ -194,23 +226,43 @@ export class UserService {
     return { productsDeleted, errors, cancelled };
   }
 
-  /** Reassign a user's owned records to another user (e.g. before deletion). */
-  async reassignOwnership(fromUserId: string, toUserId: string) {
-    const target = await User.findById(toUserId);
-    if (!target) throw createHttpError(404, 'Target user not found');
-    const filter = { ownerId: fromUserId };
-    const update = { $set: { ownerId: toUserId } };
-    const [products, activities, versions, marketing] = await Promise.all([
-      Product.updateMany(filter, update),
-      Activity.updateMany(filter, update),
-      Version.updateMany(filter, update),
-      ProductMarketing.updateMany(filter, update),
-    ]);
+  /**
+   * Hands a store's ownership to another of its members.
+   *
+   * Nothing is rewritten: products, activities and versions belong to the store
+   * and stay exactly where they are. Only the store's `ownerId` and the two
+   * users' roles change. The previous behaviour — rewriting every document from
+   * one user to another — existed because documents were owned by people; under
+   * stores it would be a no-op at best and a cross-store data move at worst.
+   */
+  async transferStoreOwnership(fromUserId: string, toUserId: string) {
+    const [from, to] = await Promise.all([User.findById(fromUserId), User.findById(toUserId)]);
+    if (!from) throw createHttpError(404, 'Current owner not found');
+    if (!to) throw createHttpError(404, 'Target user not found');
+    if (!from.storeId) throw createHttpError(400, 'That user does not belong to a store.');
+    if (from.storeRole !== 'owner') throw createHttpError(400, 'That user does not own their store.');
+    if (String(to.storeId) !== String(from.storeId)) {
+      // Handing a store to an outsider would silently pull them out of their own.
+      throw createHttpError(400, 'The new owner must already be a member of the same store.');
+    }
+    if (String(from._id) === String(to._id)) {
+      throw createHttpError(400, 'That user already owns the store.');
+    }
+
+    const store = await Store.findById(from.storeId);
+    if (!store) throw createHttpError(404, 'Store not found');
+
+    store.ownerId = to._id as never;
+    to.storeRole = 'owner';
+    // Demoted rather than removed: the outgoing owner keeps working in the store.
+    from.storeRole = 'manager';
+    await Promise.all([store.save(), to.save(), from.save()]);
+
     return {
-      products: products.modifiedCount,
-      activities: activities.modifiedCount,
-      versions: versions.modifiedCount,
-      marketing: marketing.modifiedCount,
+      storeId: String(store._id),
+      storeName: store.name,
+      newOwnerId: String(to._id),
+      previousOwnerRole: from.storeRole,
     };
   }
 }

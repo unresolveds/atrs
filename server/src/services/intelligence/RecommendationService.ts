@@ -85,7 +85,7 @@ export class RecommendationService {
    */
   static async generateRecommendations(
     productId: string | mongoose.Types.ObjectId,
-    _ownerId?: string | mongoose.Types.ObjectId,
+    _storeId?: string | mongoose.Types.ObjectId,
     opts?: { signals?: ISignal[]; context?: SignalContext; limit?: number },
   ): Promise<IRecommendation[]> {
     const plan = await RoadmapEngine.generate(productId, {
@@ -117,7 +117,7 @@ export class RecommendationService {
         { productId: item.productId, sourceRoadmapItemId: item._id },
         {
           $set: {
-            ownerId: item.ownerId,
+            storeId: item.storeId,
             title: item.title,
             description: item.description,
             rationale: item.rationale,

@@ -12,7 +12,7 @@ import { CompetitorSnapshot } from '../../models/CompetitorSnapshot';
  *
  * It previously also created an `Insight` directly, and that write could never
  * succeed: it set `type: 'competitor_release'` (not in the schema enum), omitted
- * the required `ownerId` and `confidence`, and passed four fields the schema does
+ * the required `storeId` and `confidence`, and passed four fields the schema does
  * not define. Every RSS detection threw a ValidationError which the surrounding
  * try/catch swallowed, so competitor release alerts silently never worked while the
  * logs reported success.

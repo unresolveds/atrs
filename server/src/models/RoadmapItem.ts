@@ -77,7 +77,7 @@ export interface ExpectedOutcome {
 
 export interface IRoadmapItem extends Document {
   productId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
 
   title: string;
   description: string;
@@ -147,7 +147,7 @@ const EvidenceSchema = new Schema(
 const RoadmapItemSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
 
     title: { type: String, required: true },
     description: { type: String, required: true },
@@ -220,6 +220,6 @@ const RoadmapItemSchema = new Schema(
 // One item per concern per product; the upsert key for regeneration.
 RoadmapItemSchema.index({ productId: 1, fingerprint: 1 }, { unique: true });
 RoadmapItemSchema.index({ productId: 1, horizon: 1, rank: 1 });
-RoadmapItemSchema.index({ ownerId: 1, status: 1 });
+RoadmapItemSchema.index({ storeId: 1, status: 1 });
 
 export const RoadmapItem = mongoose.model<IRoadmapItem>('RoadmapItem', RoadmapItemSchema);

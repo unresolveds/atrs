@@ -247,7 +247,7 @@ export class InsightEngine {
       ({ title, narrative } = this.templateNarrative(cluster));
     }
 
-    const breakdown = await ConfidenceScorer.score(ctx.productId, ctx.ownerId, {
+    const breakdown = await ConfidenceScorer.score(ctx.productId, ctx.storeId, {
       signals,
       llmAttempts: attempts,
       citationCount,
@@ -258,7 +258,7 @@ export class InsightEngine {
       { productId: new mongoose.Types.ObjectId(ctx.productId), fingerprint: cluster.fingerprint },
       {
         $set: {
-          ownerId: new mongoose.Types.ObjectId(ctx.ownerId),
+          storeId: new mongoose.Types.ObjectId(ctx.storeId),
           type: CATEGORY_TO_TYPE[category] ?? 'general',
           severity: this.toInsightSeverity(cluster),
           title,

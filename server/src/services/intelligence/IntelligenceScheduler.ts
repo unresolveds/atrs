@@ -19,8 +19,8 @@ import { ChangelogMonitor } from './ChangelogMonitor';
  * arrangement made the same external calls four times per product and could leave
  * engines disagreeing because they had read at different instants.
  *
- * And it queries products by `ownerId`. The original used `Product.find({ userId })`
- * against a schema whose field is `ownerId`, so it always matched zero products and
+ * And it queries products by `storeId`. The original used `Product.find({ userId })`
+ * against a schema whose field is `storeId`, so it always matched zero products and
  * scheduled analysis silently did nothing for every user who enabled it.
  */
 export class IntelligenceScheduler {
@@ -84,7 +84,7 @@ export class IntelligenceScheduler {
           (config.analysisFrequency === 'monthly' && now.getUTCDate() === 1);
 
         if (shouldRun) {
-          await this.analyzeAllProductsForUser(config.ownerId.toString());
+          await this.analyzeAllProductsForStore(config.storeId.toString());
         }
       }
     } catch (error) {
@@ -92,12 +92,11 @@ export class IntelligenceScheduler {
     }
   }
 
-  private static async analyzeAllProductsForUser(userId: string): Promise<void> {
+  /** Runs analysis across every active product in one store. */
+  private static async analyzeAllProductsForStore(storeId: string): Promise<void> {
     try {
-      // `ownerId`, not `userId` — the original queried a field that does not exist
-      // on the Product schema, so scheduled analysis never processed anything.
-      const products = await Product.find({ ownerId: userId, status: 'active' });
-      console.log(`[IntelligenceScheduler] Analyzing ${products.length} product(s) for owner ${userId}`);
+      const products = await Product.find({ storeId, status: 'active' });
+      console.log(`[IntelligenceScheduler] Analyzing ${products.length} product(s) for store ${storeId}`);
 
       for (const product of products) {
         try {
@@ -107,7 +106,7 @@ export class IntelligenceScheduler {
         }
       }
     } catch (error) {
-      console.error(`[IntelligenceScheduler] Failed to load products for owner ${userId}:`, error);
+      console.error(`[IntelligenceScheduler] Failed to load products for owner ${storeId}:`, error);
     }
   }
 
@@ -139,13 +138,13 @@ export class IntelligenceScheduler {
 
     const { signals, context } = run;
 
-    await HealthScoreService.generateScore(productId, context.ownerId, 'weekly');
+    await HealthScoreService.generateScore(productId, context.storeId, 'weekly');
 
     const insights = await InsightEngine.generate(productId, { signals, context });
     const plan = await RoadmapEngine.generate(productId, { signals, context });
 
     // Mirror the roadmap into the legacy recommendation collection so both views agree.
-    await RecommendationService.generateRecommendations(productId, context.ownerId, { signals, context });
+    await RecommendationService.generateRecommendations(productId, context.storeId, { signals, context });
 
     // Refresh the scorecard so the dashboard need not compute it on request.
     await StandoutScorecardService.generate(productId, { signals, context }).catch((error) =>

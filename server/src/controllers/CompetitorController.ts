@@ -10,7 +10,7 @@ import mongoose from 'mongoose';
 /**
  * Resolves the product owner for a request.
  *
- * Discovery and tracking write `ownerId` onto new competitor rows, and an admin
+ * Discovery and tracking write `storeId` onto new competitor rows, and an admin
  * acting on someone else's product must stamp the *owner's* id, not their own —
  * otherwise the created competitors become invisible to the person who owns the
  * product.
@@ -23,21 +23,21 @@ async function resolveOwnerId(req: Request, res: Response): Promise<string | nul
   }
 
   const query: Record<string, unknown> = { _id: productId };
-  if (req.user!.role !== 'admin') query.ownerId = req.user!.id;
+  if (req.user!.role !== 'admin') query.storeId = req.user!.id;
 
-  const product = await Product.findOne(query).select('ownerId').lean();
+  const product = await Product.findOne(query).select('storeId').lean();
   if (!product) {
     res.status(404).json({ message: 'Product not found' });
     return null;
   }
-  return String(product.ownerId);
+  return String(product.storeId);
 }
 
 // GET /api/competitors/:productId/discover
 export const discoverCompetitors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ownerId = await resolveOwnerId(req, res);
-    if (!ownerId) return;
+    const storeId = await resolveOwnerId(req, res);
+    if (!storeId) return;
 
     // Read-only: returns real WordPress.org plugins with live metrics and a
     // relevance score, for the user to confirm. Nothing is written.
@@ -53,8 +53,8 @@ export const discoverCompetitors = async (req: Request, res: Response, next: Nex
 // POST /api/competitors/:productId/track
 export const trackCompetitors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ownerId = await resolveOwnerId(req, res);
-    if (!ownerId) return;
+    const storeId = await resolveOwnerId(req, res);
+    if (!storeId) return;
 
     const slugs = Array.isArray(req.body?.slugs) ? req.body.slugs.map(String).filter(Boolean) : [];
     if (slugs.length === 0) {
@@ -64,7 +64,7 @@ export const trackCompetitors = async (req: Request, res: Response, next: NextFu
 
     const added = await CompetitorIntelService.addDiscovered(
       req.params.productId as string,
-      ownerId,
+      storeId,
       slugs.slice(0, 10),
     );
 
@@ -82,8 +82,8 @@ export const trackCompetitors = async (req: Request, res: Response, next: NextFu
 // POST /api/competitors/:productId/sync
 export const syncCompetitors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ownerId = await resolveOwnerId(req, res);
-    if (!ownerId) return;
+    const storeId = await resolveOwnerId(req, res);
+    if (!storeId) return;
 
     const result = await MarketDataService.captureAllForProduct(req.params.productId as string, { force: true });
     res.status(200).json({
@@ -101,7 +101,7 @@ export const getCompetitors = async (req: Request, res: Response, next: NextFunc
     const { productId } = req.params;
     const query: any = { productId };
     if (req.user!.role !== 'admin') {
-      query.ownerId = req.user!.id;
+      query.storeId = req.user!.id;
     }
 
     const competitors = await Competitor.find(query).sort({ createdAt: -1 });
@@ -117,7 +117,7 @@ export const getCompetitorDetails = async (req: Request, res: Response, next: Ne
     const { productId, competitorId } = req.params;
     const query: any = { _id: competitorId, productId };
     if (req.user!.role !== 'admin') {
-      query.ownerId = req.user!.id;
+      query.storeId = req.user!.id;
     }
 
     const competitor = await Competitor.findOne(query);
@@ -142,12 +142,12 @@ export const getCompetitorDetails = async (req: Request, res: Response, next: Ne
 export const createCompetitor = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { productId } = req.params;
-    const ownerId = req.user!.id;
+    const storeId = req.user!.id;
 
     const competitor = new Competitor({
       ...req.body,
       productId,
-      ownerId,
+      storeId,
     });
 
     await competitor.save();
@@ -162,10 +162,10 @@ export const createCompetitor = async (req: Request, res: Response, next: NextFu
 export const updateCompetitor = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { productId, competitorId } = req.params;
-    const ownerId = req.user!.id;
+    const storeId = req.user!.id;
 
     const competitor = await Competitor.findOneAndUpdate(
-      { _id: competitorId, productId, ownerId },
+      { _id: competitorId, productId, storeId },
       { $set: req.body },
       { new: true, runValidators: true }
     );
@@ -185,9 +185,9 @@ export const updateCompetitor = async (req: Request, res: Response, next: NextFu
 export const deleteCompetitor = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { productId, competitorId } = req.params;
-    const ownerId = req.user!.id;
+    const storeId = req.user!.id;
 
-    const competitor = await Competitor.findOneAndDelete({ _id: competitorId, productId, ownerId });
+    const competitor = await Competitor.findOneAndDelete({ _id: competitorId, productId, storeId });
 
     if (!competitor) {
       res.status(404).json({ message: 'Competitor not found' });
@@ -207,7 +207,7 @@ export const deleteCompetitor = async (req: Request, res: Response, next: NextFu
 export const autoDiscoverCompetitors = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const productId = req.params.productId as string;
-    let ownerId = req.user!.id;
+    let storeId = req.user!.id;
 
     // Admins need to discover for the actual product owner
     if (req.user!.role === 'admin') {
@@ -216,10 +216,10 @@ export const autoDiscoverCompetitors = async (req: Request, res: Response, next:
         res.status(404).json({ message: 'Product not found' });
         return;
       }
-      ownerId = product.ownerId.toString();
+      storeId = product.storeId.toString();
     }
 
-    const result = await CompetitorDiscoveryService.autoDiscover(productId, ownerId);
+    const result = await CompetitorDiscoveryService.autoDiscover(productId, storeId);
     res.status(200).json({
       message: result.caveat ?? 'Auto-discovery complete',
       discoveredCount: result.added.length,

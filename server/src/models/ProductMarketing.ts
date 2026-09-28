@@ -33,7 +33,7 @@ export interface IFAQ {
 }
 
 export interface IProductMarketing extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   pluginName: string;
   trailerVideo: string;
@@ -89,7 +89,7 @@ const FAQSchema = new Schema({
 
 const ProductMarketingSchema: Schema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',

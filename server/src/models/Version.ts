@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IVersion extends Document {
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   productId: mongoose.Types.ObjectId;
   label: string;
   notes?: string;
@@ -20,7 +20,7 @@ export interface IVersion extends Document {
 
 const VersionSchema: Schema = new Schema(
   {
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',

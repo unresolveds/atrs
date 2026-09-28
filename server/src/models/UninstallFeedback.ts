@@ -16,7 +16,7 @@ import mongoose, { Schema, Document } from 'mongoose';
  */
 export interface IUninstallFeedback extends Document {
   productId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   /** Freemius install id — the natural key, used to upsert idempotently. */
   freemiusInstallId: number;
   /** Freemius' own uninstall record id, when present. */
@@ -41,7 +41,7 @@ export interface IUninstallFeedback extends Document {
 const UninstallFeedbackSchema: Schema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     freemiusInstallId: { type: Number, required: true },
     freemiusUninstallId: { type: Number },
     reasonId: { type: Number, required: true, index: true },

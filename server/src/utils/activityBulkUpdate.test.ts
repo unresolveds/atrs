@@ -37,10 +37,10 @@ describe('buildActivityBulkUpdate', () => {
   it('ignores rogue operator keys and never emits them', () => {
     // A rogue operator key is simply not a recognized field, so it contributes
     // nothing — the builder throws "no valid fields" rather than forwarding it.
-    expect(() => buildActivityBulkUpdate({ $set: { ownerId: 'evil' } } as any)).toThrowError(/No valid fields/);
+    expect(() => buildActivityBulkUpdate({ $set: { storeId: 'evil' } } as any)).toThrowError(/No valid fields/);
     // And when mixed with a real field, only the real field is emitted.
-    const doc = buildActivityBulkUpdate({ type: 'feature', $set: { ownerId: 'evil' } } as any);
-    expect(JSON.stringify(doc)).not.toContain('ownerId');
+    const doc = buildActivityBulkUpdate({ type: 'feature', $set: { storeId: 'evil' } } as any);
+    expect(JSON.stringify(doc)).not.toContain('storeId');
     expect(doc).toEqual({ $set: { type: 'feature' } });
   });
 });
@@ -60,9 +60,9 @@ describe('bulkUpdateActivitiesSchema (operator-injection guard)', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects a $set ownerId reassignment attempt', () => {
+  it('rejects a $set storeId reassignment attempt', () => {
     const result = bulkUpdateActivitiesSchema.safeParse({
-      body: { ids: [validId], update: { $set: { ownerId: validId } } },
+      body: { ids: [validId], update: { $set: { storeId: validId } } },
     });
     expect(result.success).toBe(false);
   });

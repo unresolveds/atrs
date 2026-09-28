@@ -16,11 +16,11 @@ export type FeatureGapAnalysis = GapAnalysis;
 
 export class FeatureGapAnalyzer {
   /**
-   * `ownerId` is accepted but unused: ownership is already enforced by the
+   * `storeId` is accepted but unused: ownership is already enforced by the
    * controller before this is reached, and the analysis is derived from public
    * directory data rather than from anything owner-scoped.
    */
-  static async analyzeGaps(productId: string, _ownerId?: string): Promise<GapAnalysis> {
+  static async analyzeGaps(productId: string, _storeId?: string): Promise<GapAnalysis> {
     return CompetitorIntelService.analyzeGaps(productId);
   }
 }

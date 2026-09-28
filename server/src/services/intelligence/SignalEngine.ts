@@ -113,7 +113,7 @@ export class SignalEngine {
         update: {
           $set: {
             productId: new mongoose.Types.ObjectId(ctx.productId),
-            ownerId: new mongoose.Types.ObjectId(ctx.ownerId),
+            storeId: new mongoose.Types.ObjectId(ctx.storeId),
             ...(s.competitorId ? { competitorId: new mongoose.Types.ObjectId(s.competitorId) } : {}),
             code: s.code,
             category: s.category,

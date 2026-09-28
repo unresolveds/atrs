@@ -1,12 +1,27 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+import type { StoreRole } from './Store';
+
+/**
+ * Platform-level role, distinct from the per-store role below. `admin` is an
+ * operator of the whole deployment and can see inside every store; it is not a
+ * store position, and a store owner is not an admin.
+ */
 export type UserRole = 'admin' | 'user';
 export type UserStatus = 'pending' | 'active' | 'suspended';
 
 export interface IUser extends Document {
   name: string;
   email: string;
+  /**
+   * The store this user works in. A user belongs to exactly one, and everything
+   * they create is scoped to it. Null between signing up and creating or being
+   * invited to a store — the only state in which a user has no tenancy.
+   */
+  storeId?: mongoose.Types.ObjectId | null;
+  /** Their position within that store. Absent when `storeId` is. */
+  storeRole?: StoreRole;
   /** Optional role/title shown as the presenter's subtitle on report decks. */
   jobTitle?: string;
   passwordHash: string;
@@ -48,6 +63,10 @@ const UserSchema: Schema = new Schema(
     },
     jobTitle: { type: String, default: '', trim: true },
     passwordHash: { type: String, required: true },
+    // Tenancy. Indexed because listing a store's members filters on it, and the
+    // auth middleware reads it on every authenticated request.
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', default: null, index: true },
+    storeRole: { type: String, enum: ['owner', 'manager', 'developer'] },
     role: {
       type: String,
       enum: ['admin', 'user'],

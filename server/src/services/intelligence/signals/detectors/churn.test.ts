@@ -24,7 +24,7 @@ const many = (n: number, id: number, label: string, daysAgo = 1) =>
 function ctx(uninstalls: any[], overrides: Partial<SignalContext> = {}): SignalContext {
   return {
     productId: 'p1',
-    ownerId: 'o1',
+    storeId: 'o1',
     product: { freemiusProductId: '6749' } as any,
     now: NOW,
     issues: [],

@@ -4,7 +4,7 @@ import { Product } from '../models/Product';
 import { Issue } from '../models/Issue';
 import { AuditLogService } from './AuditLogService';
 import { deleteMediaFiles } from '../utils/fileUtils';
-import { scopeFilter, assertOwner } from '../utils/ownership';
+import { storeFilter, assertStoreAccess } from '../utils/ownership';
 import { escapeRegex } from '../utils/sanitize';
 import { parseLimit, parsePage } from '../utils/pagination';
 import { buildActivityBulkUpdate } from '../utils/activityBulkUpdate';
@@ -22,10 +22,10 @@ export class ActivityService {
   async createActivity(data: any, user: AuthUser): Promise<IActivity> {
     // The activity inherits ownership from its product; the user must own that product.
     const product = await Product.findById(data.productId);
-    assertOwner(product, user);
-    const activity = await this.repository.create({ ...data, ownerId: product!.ownerId });
+    assertStoreAccess(product, user);
+    const activity = await this.repository.create({ ...data, storeId: product!.storeId });
     await auditLogService.logEvent('CREATE', 'ACTIVITY', activity._id.toString(), activity.title, `Logged a new ${activity.type}`, { id: user.id, name: user.name });
-    await this.resolveLinkedIssues(activity, product!.ownerId);
+    await this.resolveLinkedIssues(activity, product!.storeId);
     return activity;
   }
 
@@ -35,18 +35,18 @@ export class ActivityService {
    * closing the issue out. Only touches still-open issues so re-saves and
    * manual re-openings are respected. Scoped to the product's owner.
    */
-  private async resolveLinkedIssues(activity: IActivity | null, ownerId: any): Promise<void> {
+  private async resolveLinkedIssues(activity: IActivity | null, storeId: any): Promise<void> {
     if (!activity || activity.type !== 'bug-fix') return;
     const issueIds = (activity.relatedIssueIds || []).map((id: any) => (id?._id ? id._id : id));
     if (issueIds.length === 0) return;
     await Issue.updateMany(
-      { _id: { $in: issueIds }, ownerId, status: { $in: ['open', 'in-progress'] } },
+      { _id: { $in: issueIds }, storeId, status: { $in: ['open', 'in-progress'] } },
       { $set: { status: 'resolved', resolvedAt: activity.activityDate || new Date() } }
     );
   }
 
   async getActivities(query: any, user: AuthUser): Promise<any> {
-    const filter: any = scopeFilter(user);
+    const filter: any = storeFilter(user);
     if (query.productId) filter.productId = query.productId;
     if (query.type) filter.type = query.type;
     if (query.tier) filter.tier = query.tier;
@@ -57,8 +57,8 @@ export class ActivityService {
     if (query.versioned === 'none') filter.versionId = { $in: [null] };
     else if (query.versioned === 'has') filter.versionId = { $ne: null };
     if (query.needsReview === 'true' || query.needsReview === true) filter.needsReview = true;
-    if (query.ownerId && user.role === 'admin') {
-      filter.ownerId = query.ownerId;
+    if (query.storeId && user.role === 'admin') {
+      filter.storeId = query.storeId;
     }
     if (query.search) {
       filter.title = { $regex: escapeRegex(query.search), $options: 'i' };
@@ -85,14 +85,14 @@ export class ActivityService {
 
   async getActivityById(id: string, user: AuthUser): Promise<IActivity | null> {
     const activity = await this.repository.findById(id);
-    assertOwner(activity, user);
+    assertStoreAccess(activity, user);
     return activity;
   }
 
   async updateActivity(id: string, data: any, user: AuthUser): Promise<IActivity | null> {
     const oldActivity = await this.repository.findById(id);
-    assertOwner(oldActivity, user);
-    delete data.ownerId;
+    assertStoreAccess(oldActivity, user);
+    delete data.storeId;
     // Never allow re-parenting to another product: ownership is only asserted
     // on the existing doc, and downstream release assembly trusts productId.
     delete data.productId;
@@ -100,7 +100,7 @@ export class ActivityService {
 
     if (activity) {
       await auditLogService.logEvent('UPDATE', 'ACTIVITY', activity._id.toString(), activity.title, `Updated ${activity.type}`, { id: user.id, name: user.name });
-      await this.resolveLinkedIssues(activity, activity.ownerId);
+      await this.resolveLinkedIssues(activity, activity.storeId);
 
       if (oldActivity) {
         const getMediaUrls = (act: any) => {
@@ -129,7 +129,7 @@ export class ActivityService {
 
   async deleteActivity(id: string, user: AuthUser): Promise<IActivity | null> {
     const existing = await this.repository.findById(id);
-    assertOwner(existing, user);
+    assertStoreAccess(existing, user);
     const activity = await this.repository.delete(id);
     if (activity) {
       await auditLogService.logEvent('DELETE', 'ACTIVITY', activity._id.toString(), activity.title, `Deleted ${activity.type}`, { id: user.id, name: user.name });
@@ -151,11 +151,11 @@ export class ActivityService {
     // Never forward client-supplied keys/operators to the database. The update
     // document is assembled server-side from whitelisted fields only.
     const updateDoc = buildActivityBulkUpdate(update || {});
-    return await this.repository.bulkUpdate(ids, updateDoc, scopeFilter(user));
+    return await this.repository.bulkUpdate(ids, updateDoc, storeFilter(user));
   }
 
   async bulkDeleteActivities(ids: string[], user: AuthUser): Promise<number> {
-    const scope = scopeFilter(user);
+    const scope = storeFilter(user);
     const activities = await this.repository.findManyByIds(ids, scope);
     const ownedIds = activities.map(a => a._id.toString());
     const deletedCount = await this.repository.bulkDelete(ownedIds, scope);
@@ -178,7 +178,7 @@ export class ActivityService {
 
   async reorderActivity(id: string, displayOrder: number, user: AuthUser): Promise<IActivity | null> {
     const existing = await this.repository.findById(id);
-    assertOwner(existing, user);
+    assertStoreAccess(existing, user);
     return await this.repository.reorder(id, displayOrder);
   }
 }

@@ -8,7 +8,7 @@ import { canonicalVersion, changelogFingerprint } from '../utils/readmeChangelog
 /**
  * Idempotent startup task:
  *  1. Ensure a single root admin exists (created from ROOT_ADMIN_* env vars).
- *  2. Back-fill ownerId = rootAdminId on any pre-existing ownerless records.
+ *  2. Back-fill storeId = rootAdminId on any pre-existing ownerless records.
  *
  * Safe to run on every boot; once everything is owned, step 2 is a no-op.
  */
@@ -22,9 +22,9 @@ export async function seedAndMigrate(): Promise<void> {
   const rootAdmin = await ensureRootAdmin();
   if (!rootAdmin) return;
 
-  const ownerId = rootAdmin._id;
-  const filter = { ownerId: { $exists: false } };
-  const update = { $set: { ownerId } };
+  const storeId = rootAdmin._id;
+  const filter = { storeId: { $exists: false } };
+  const update = { $set: { storeId } };
 
   const [products, activities, versions, marketing] = await Promise.all([
     Product.updateMany(filter, update),
@@ -201,7 +201,7 @@ async function backfillChangelogFingerprints(): Promise<void> {
 /**
  * Older builds declared Product.slug as globally unique (index `slug_1`).
  * Slugs are now unique per owner, so drop the legacy global index if present;
- * the new compound index `{ ownerId, slug }` is created automatically by Mongoose.
+ * the new compound index `{ storeId, slug }` is created automatically by Mongoose.
  */
 async function dropLegacyProductSlugIndex(): Promise<void> {
   try {

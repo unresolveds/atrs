@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { storeFilter } from '../utils/ownership';
 import path from 'path';
 import { Product } from '../models/Product';
 import { ProductMarketing } from '../models/ProductMarketing';
@@ -89,17 +90,19 @@ export class MediaService {
     return resolved;
   }
 
-  /** Loads every entity that can reference media, scoped to the user unless admin. */
+  /** Loads every entity that can reference media, scoped to the user's store unless admin. */
   private async loadMediaEntities(user?: AuthUser): Promise<IMediaEntities> {
-    const isAdmin = user?.role === 'admin';
-    const ownerScope = isAdmin || !user ? {} : { ownerId: user.id };
+    // storeFilter already exempts admins and matches nothing for a user with no
+    // store — important here, because an unscoped filter would sweep every
+    // store's media into one orphan report.
+    const storeScope = storeFilter(user);
 
     const [products, marketings, activities] = await Promise.all([
-      Product.find(ownerScope, 'name slug banner icon').lean(),
-      ProductMarketing.find(ownerScope, 'productId pluginName thumbnailImage trailerVideo tutorialVideo keyFeatures screenshots')
+      Product.find(storeScope, 'name slug banner icon').lean(),
+      ProductMarketing.find(storeScope, 'productId pluginName thumbnailImage trailerVideo tutorialVideo keyFeatures screenshots')
         .populate('productId', 'name slug')
         .lean(),
-      Activity.find(ownerScope, 'productId type title mediaUrl mediaUrls items')
+      Activity.find(storeScope, 'productId type title mediaUrl mediaUrls items')
         .populate('productId', 'name slug')
         .lean()
     ]);

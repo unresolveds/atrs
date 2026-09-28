@@ -20,7 +20,7 @@ import type {
  */
 export interface ISignal extends Document {
   productId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
+  storeId: mongoose.Types.ObjectId;
   competitorId?: mongoose.Types.ObjectId;
 
   code: SignalCode;
@@ -63,7 +63,7 @@ const EvidenceSchema = new Schema(
 const SignalSchema = new Schema(
   {
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     competitorId: { type: Schema.Types.ObjectId, ref: 'Competitor' },
 
     code: { type: String, required: true, index: true },

@@ -345,7 +345,7 @@ export class CompetitorIntelService {
    */
   static async addDiscovered(
     productId: string | mongoose.Types.ObjectId,
-    ownerId: string | mongoose.Types.ObjectId,
+    storeId: string | mongoose.Types.ObjectId,
     slugs: string[],
   ): Promise<ICompetitor[]> {
     const product = await Product.findById(productId);
@@ -359,7 +359,7 @@ export class CompetitorIntelService {
       if (existing) continue;
 
       const competitor = await Competitor.create({
-        ownerId: new mongoose.Types.ObjectId(String(ownerId)),
+        storeId: new mongoose.Types.ObjectId(String(storeId)),
         productId: new mongoose.Types.ObjectId(String(productId)),
         name: info.name,
         url: info.homepage || `https://wordpress.org/plugins/${info.slug}/`,

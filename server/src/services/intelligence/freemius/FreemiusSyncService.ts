@@ -60,9 +60,9 @@ export function resolveCredentials(product: Pick<IProduct,
 
 export class FreemiusSyncService {
   /** Products this owner has connected to Freemius. */
-  static async connectedProducts(ownerId?: string): Promise<IProduct[]> {
+  static async connectedProducts(storeId?: string): Promise<IProduct[]> {
     const filter: Record<string, unknown> = { freemiusProductId: { $nin: ['', null] } };
-    if (ownerId) filter.ownerId = ownerId;
+    if (storeId) filter.storeId = storeId;
     return Product.find(filter).select('+freemiusPublicKey +freemiusSecretKey');
   }
 
@@ -81,7 +81,7 @@ export class FreemiusSyncService {
       { productId: product._id, freemiusInstallId: installId },
       {
         $set: {
-          ownerId: product.ownerId,
+          storeId: product.storeId,
           freemiusUninstallId: u.id,
           reasonId: Number(u.reason_id),
           // The API supplies the label; mapping ids locally would silently go

@@ -1,7 +1,7 @@
 import { Version, IVersion } from '../models/Version';
 import { Product } from '../models/Product';
 import { AuditLogService } from './AuditLogService';
-import { scopeFilter, assertOwner } from '../utils/ownership';
+import { storeFilter, assertStoreAccess } from '../utils/ownership';
 import type { AuthUser } from '../types/auth';
 
 const auditLogService = new AuditLogService();
@@ -9,8 +9,8 @@ const auditLogService = new AuditLogService();
 export class VersionService {
   async createVersion(data: any, user: AuthUser): Promise<IVersion> {
     const product = await Product.findById(data.productId);
-    assertOwner(product, user);
-    const version = new Version({ ...data, ownerId: product!.ownerId });
+    assertStoreAccess(product, user);
+    const version = new Version({ ...data, storeId: product!.storeId });
     await version.save();
     await auditLogService.logEvent('CREATE', 'VERSION', version._id.toString(), version.label, `Created version ${version.label}`, { id: user.id, name: user.name });
     return version;
@@ -20,7 +20,7 @@ export class VersionService {
     // With a productId, return that product's versions. Without one, return
     // every version the user owns and populate the product so the dashboard
     // can group and link them.
-    const filter = productId ? scopeFilter(user, { productId }) : scopeFilter(user);
+    const filter = productId ? storeFilter(user, { productId }) : storeFilter(user);
     const query = Version.find(filter).sort({ releasedAt: -1, createdAt: -1 });
     if (!productId) query.populate('productId', 'name slug icon');
     return await query;
@@ -28,14 +28,14 @@ export class VersionService {
 
   async getVersionById(id: string, user: AuthUser): Promise<IVersion | null> {
     const version = await Version.findById(id);
-    assertOwner(version, user);
+    assertStoreAccess(version, user);
     return version;
   }
 
   async updateVersion(id: string, data: any, user: AuthUser): Promise<IVersion | null> {
     const existing = await Version.findById(id);
-    assertOwner(existing, user);
-    delete data.ownerId;
+    assertStoreAccess(existing, user);
+    delete data.storeId;
     // Never allow re-parenting to another product: ownership is only asserted
     // on the existing doc, and downstream release assembly trusts productId.
     delete data.productId;
@@ -48,7 +48,7 @@ export class VersionService {
 
   async deleteVersion(id: string, user: AuthUser): Promise<IVersion | null> {
     const existing = await Version.findById(id);
-    assertOwner(existing, user);
+    assertStoreAccess(existing, user);
     const version = await Version.findByIdAndDelete(id);
     if (version) {
       await auditLogService.logEvent('DELETE', 'VERSION', version._id.toString(), version.label, `Deleted version ${version.label}`, { id: user.id, name: user.name });

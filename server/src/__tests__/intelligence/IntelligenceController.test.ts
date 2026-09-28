@@ -51,7 +51,7 @@ function buildRes() {
 describe('IntelligenceController.getHealthScore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(Product.findOne).mockResolvedValue({ _id: PRODUCT_ID, ownerId: OWNER_ID } as never);
+    vi.mocked(Product.findOne).mockResolvedValue({ _id: PRODUCT_ID, storeId: OWNER_ID } as never);
   });
 
   it('returns the cached score for an authorised product', async () => {
@@ -73,7 +73,7 @@ describe('IntelligenceController.getHealthScore', () => {
   it('passes the product owner id, not the requesting admin id', async () => {
     // An admin inspecting someone else's product must not have their own id stamped
     // onto the generated records.
-    vi.mocked(Product.findOne).mockResolvedValue({ _id: PRODUCT_ID, ownerId: OWNER_ID } as never);
+    vi.mocked(Product.findOne).mockResolvedValue({ _id: PRODUCT_ID, storeId: OWNER_ID } as never);
     vi.mocked(HealthScoreService.getScore).mockResolvedValue({ overallScore: 70 } as never);
 
     const req = buildReq({ user: { id: 'adminUserId', role: 'admin' } as never });
