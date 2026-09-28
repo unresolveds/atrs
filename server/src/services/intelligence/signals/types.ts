@@ -29,6 +29,13 @@ export const SIGNAL_CODES = [
   'traction.installs_growing',
   'traction.installs_stalled',
   'traction.churn_gap',
+  // Stated churn reasons (Freemius uninstall feedback)
+  'churn.reason_concentrated',
+  'churn.expectation_mismatch',
+  'churn.broke_or_failed',
+  'churn.lost_to_alternative',
+  'churn.onboarding_confusion',
+  'churn.feedback_volume_low',
   // Reputation
   'reputation.rating_low',
   'reputation.rating_declining',
@@ -68,6 +75,7 @@ export type SignalCategory =
   | 'stability'
   | 'velocity'
   | 'traction'
+  | 'churn'
   | 'reputation'
   | 'support'
   | 'discoverability'
@@ -148,6 +156,8 @@ export const CATEGORY_TO_PILLAR: Record<SignalCategory, string> = {
   stability: 'productHealth',
   velocity: 'releaseDiscipline',
   traction: 'marketTraction',
+  // Stated churn reasons are retention evidence, so they roll up with traction.
+  churn: 'marketTraction',
   reputation: 'reputation',
   support: 'reputation',
   discoverability: 'discoverability',

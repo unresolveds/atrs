@@ -44,6 +44,7 @@ const CATEGORY_LABEL: Record<SignalCategory, { title: string; lens: string }> = 
   stability: { title: 'Stability', lens: 'defect load and how it affects users' },
   velocity: { title: 'Release discipline', lens: 'shipping cadence and delivery process' },
   traction: { title: 'Market traction', lens: 'install growth and retention' },
+  churn: { title: 'Why users leave', lens: 'the reasons users gave when they uninstalled' },
   reputation: { title: 'Reputation', lens: 'ratings, reviews and public perception' },
   support: { title: 'Support load', lens: 'support responsiveness and its downstream effect on reviews' },
   discoverability: { title: 'Discoverability', lens: 'directory listing quality and install conversion' },
@@ -57,6 +58,10 @@ const CATEGORY_TO_TYPE: Record<SignalCategory, InsightType> = {
   stability: 'stability',
   velocity: 'velocity',
   traction: 'traction',
+  // Deliberately reuses the persisted 'traction' type rather than adding a new
+  // enum value: churn reasons are retention evidence, and the Insight type enum
+  // is stored, so extending it would be a migration for no analytical gain.
+  churn: 'traction',
   reputation: 'reputation',
   support: 'support',
   discoverability: 'discoverability',

@@ -7,6 +7,7 @@ import { velocityDetectors } from './signals/detectors/velocity';
 import { marketDetectors } from './signals/detectors/market';
 import { discoverabilityDetectors } from './signals/detectors/discoverability';
 import { competitiveDetectors, competitiveMultiDetectors } from './signals/detectors/competitive';
+import { churnDetectors } from './signals/detectors/churn';
 
 /**
  * Runs every detector and reconciles the results against what's already stored.
@@ -30,6 +31,7 @@ const SINGLE_DETECTORS: SingleDetector[] = [
   ...marketDetectors,
   ...discoverabilityDetectors,
   ...competitiveDetectors,
+  ...churnDetectors,
 ];
 
 const MULTI_DETECTORS: MultiDetector[] = [...competitiveMultiDetectors];

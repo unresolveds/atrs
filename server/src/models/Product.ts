@@ -12,6 +12,15 @@ export interface IProduct extends Document {
   wpReadme?: string;
   /** Absolute local path to the product's source repo, watched by the code-activity tracker. */
   repoPath?: string;
+  /**
+   * Freemius product ("plugin") id, linking this product to its Freemius account
+   * so uninstall feedback can be pulled. The keys below are product-scoped, so
+   * each tracked product carries its own pair.
+   */
+  freemiusProductId?: string;
+  /** Sealed at rest and never serialized — see `utils/crypto.ts`. */
+  freemiusPublicKey?: string;
+  freemiusSecretKey?: string;
   /** When true, the product's changelog is served on the public /changelog/:id page. */
   publicChangelogEnabled?: boolean;
   /** When true, the product's issues are served on the public /issues/:id page. */
@@ -39,6 +48,11 @@ const ProductSchema: Schema = new Schema(
     wpOrgSlug: { type: String, default: '' },
     wpReadme: { type: String, default: '' },
     repoPath: { type: String, default: '' },
+    freemiusProductId: { type: String, default: '' },
+    // Write-only credentials: `select: false` keeps them out of every ordinary
+    // read, so they cannot reach an API response by accident. Stored sealed.
+    freemiusPublicKey: { type: String, select: false },
+    freemiusSecretKey: { type: String, select: false },
     publicChangelogEnabled: { type: Boolean, default: false },
     publicIssuesEnabled: { type: Boolean, default: false },
     listedInDirectory: { type: Boolean, default: true },

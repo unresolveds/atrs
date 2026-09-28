@@ -6,6 +6,7 @@ import { InsightEngine } from './InsightEngine';
 import { RecommendationService } from './RecommendationService';
 import { RoadmapEngine } from './RoadmapEngine';
 import { SignalEngine } from './SignalEngine';
+import { FreemiusSyncService } from './freemius/FreemiusSyncService';
 import { StandoutScorecardService } from './StandoutScorecardService';
 import { ChangelogMonitor } from './ChangelogMonitor';
 
@@ -49,6 +50,19 @@ export class IntelligenceScheduler {
       const result = await ChangelogMonitor.monitorAll();
       if (result.newItems > 0) {
         console.log(`[IntelligenceScheduler] Captured ${result.newItems} new competitor changelog item(s).`);
+      }
+
+      // Uninstall feedback rides the same tick: it is the same shape of work —
+      // a cheap external poll that only writes facts. Failures are logged and
+      // swallowed so a Freemius outage cannot stop competitor monitoring.
+      try {
+        const churn = await FreemiusSyncService.syncAll();
+        if (churn.stored > 0) {
+          console.log(`[IntelligenceScheduler] Stored ${churn.stored} new uninstall reason(s) across ${churn.products} product(s).`);
+        }
+        for (const e of churn.errors) console.warn(`[IntelligenceScheduler] Freemius sync: ${e}`);
+      } catch (err) {
+        console.error('[IntelligenceScheduler] Freemius sync failed:', err instanceof Error ? err.message : err);
       }
     });
 

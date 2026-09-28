@@ -5,6 +5,7 @@ import { Version, type IVersion } from '../../../models/Version';
 import { Activity, type IActivity } from '../../../models/Activity';
 import { Competitor, type ICompetitor } from '../../../models/Competitor';
 import type { IMarketSnapshot } from '../../../models/MarketSnapshot';
+import { UninstallFeedback, type IUninstallFeedback } from '../../../models/UninstallFeedback';
 import { WpOrgClient, type WpPluginInfo } from '../wporg/WpOrgClient';
 import { computeCadence, extractFeatures, parseChangelog, type CadenceFacts } from '../wporg/readme';
 import { MarketDataService } from '../MarketDataService';
@@ -55,6 +56,13 @@ export interface SignalContext {
   currentWp: string | null;
   ownFeatures: string[];
 
+  /**
+   * Stated uninstall reasons pulled from Freemius, newest first. Empty when the
+   * product isn't connected — the churn detectors then stay silent rather than
+   * reporting a zero they can't justify.
+   */
+  uninstalls: IUninstallFeedback[];
+
   competitors: CompetitorContext[];
 }
 
@@ -78,7 +86,7 @@ export async function buildSignalContext(
     await MarketDataService.captureAllForProduct(pid).catch(() => undefined);
   }
 
-  const [issues, versions, activities, competitorDocs, productSeries, currentWp] = await Promise.all([
+  const [issues, versions, activities, competitorDocs, productSeries, currentWp, uninstalls] = await Promise.all([
     // Issues are loaded unfiltered by date: an open critical bug from 18 months
     // ago is precisely the thing an aging-backlog detector must see.
     Issue.find({ productId: pid }).lean() as unknown as Promise<IIssue[]>,
@@ -89,6 +97,11 @@ export async function buildSignalContext(
     Competitor.find({ productId: pid, status: 'active' }),
     MarketDataService.getProductSeries(pid),
     WpOrgClient.getCurrentWpVersion(),
+    // Same year-long window as the rest of the context; detectors narrow it further.
+    // The _id tiebreaker keeps the sort total when two uninstalls share a timestamp.
+    UninstallFeedback.find({ productId: pid, uninstalledAt: { $gte: since } })
+      .sort({ uninstalledAt: -1, _id: -1 })
+      .lean() as unknown as Promise<IUninstallFeedback[]>,
   ]);
 
   const wpInfo = product.wpOrgSlug ? await WpOrgClient.getPlugin(product.wpOrgSlug) : null;
@@ -131,6 +144,7 @@ export async function buildSignalContext(
     cadence,
     currentWp,
     ownFeatures,
+    uninstalls,
     competitors,
   };
 }

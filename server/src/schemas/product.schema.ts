@@ -13,6 +13,10 @@ export const createProductSchema = z.object({
     wpOrgSlug: z.string().optional(),
     wpReadme: z.string().optional(),
     repoPath: z.string().optional(),
+    // Links the product to its Freemius account so uninstall feedback can be
+    // pulled. The API keys are deliberately NOT settable here — they are
+    // write-only credentials and belong on a dedicated connect route.
+    freemiusProductId: z.string().trim().regex(/^[0-9]*$/, 'Freemius product id must be numeric').optional(),
   }),
 });
 
@@ -28,6 +32,10 @@ export const updateProductSchema = z.object({
     wpOrgSlug: z.string().optional(),
     wpReadme: z.string().optional(),
     repoPath: z.string().optional(),
+    // Links the product to its Freemius account so uninstall feedback can be
+    // pulled. The API keys are deliberately NOT settable here — they are
+    // write-only credentials and belong on a dedicated connect route.
+    freemiusProductId: z.string().trim().regex(/^[0-9]*$/, 'Freemius product id must be numeric').optional(),
     publicChangelogEnabled: z.boolean().optional(),
     publicIssuesEnabled: z.boolean().optional(),
     listedInDirectory: z.boolean().optional(),
