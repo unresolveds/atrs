@@ -27,9 +27,12 @@ import type { SignalContext } from './signals/context';
  */
 
 /** Categories that earn their own insight card, in feed order. */
-const CATEGORY_ORDER: SignalCategory[] = [
+export const CATEGORY_ORDER: SignalCategory[] = [
   'compliance',
   'stability',
+  // Sits with stability: the failure-churn signal is users reporting the same
+  // breakage by leaving instead of filing an issue, so the two read together.
+  'churn',
   'reputation',
   'support',
   'traction',
@@ -40,7 +43,7 @@ const CATEGORY_ORDER: SignalCategory[] = [
 ];
 
 /** Human framing for each category, used in prompts and fallbacks. */
-const CATEGORY_LABEL: Record<SignalCategory, { title: string; lens: string }> = {
+export const CATEGORY_LABEL: Record<SignalCategory, { title: string; lens: string }> = {
   stability: { title: 'Stability', lens: 'defect load and how it affects users' },
   velocity: { title: 'Release discipline', lens: 'shipping cadence and delivery process' },
   traction: { title: 'Market traction', lens: 'install growth and retention' },
@@ -54,7 +57,7 @@ const CATEGORY_LABEL: Record<SignalCategory, { title: string; lens: string }> = 
 };
 
 /** Maps a signal category onto the insight type stored on the document. */
-const CATEGORY_TO_TYPE: Record<SignalCategory, InsightType> = {
+export const CATEGORY_TO_TYPE: Record<SignalCategory, InsightType> = {
   stability: 'stability',
   velocity: 'velocity',
   traction: 'traction',

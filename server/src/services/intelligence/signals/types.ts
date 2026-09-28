@@ -71,17 +71,29 @@ export const SIGNAL_CODES = [
 
 export type SignalCode = (typeof SIGNAL_CODES)[number];
 
-export type SignalCategory =
-  | 'stability'
-  | 'velocity'
-  | 'traction'
-  | 'churn'
-  | 'reputation'
-  | 'support'
-  | 'discoverability'
-  | 'compliance'
-  | 'competitive'
-  | 'coverage';
+/**
+ * The category vocabulary, as a runtime value rather than a bare type union.
+ *
+ * A union alone cannot be enumerated at runtime, so every list of categories
+ * elsewhere — the insight feed order, the API's query enum — had to repeat it by
+ * hand, and the compiler could not tell when one drifted. Adding `churn` and
+ * missing `CATEGORY_ORDER` made churn signals store correctly and then never
+ * reach a user. Derive from this, or assert against it in a test.
+ */
+export const SIGNAL_CATEGORIES = [
+  'stability',
+  'velocity',
+  'traction',
+  'churn',
+  'reputation',
+  'support',
+  'discoverability',
+  'compliance',
+  'competitive',
+  'coverage',
+] as const;
+
+export type SignalCategory = (typeof SIGNAL_CATEGORIES)[number];
 
 /** Whether the observation is good news, bad news, or context. */
 export type SignalDirection = 'positive' | 'negative' | 'neutral';

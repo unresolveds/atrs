@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SIGNAL_CATEGORIES } from '../services/intelligence/signals/types';
 
 /**
  * Request schemas for the intelligence API.
@@ -32,19 +33,9 @@ export const getSignalsSchema = z.object({
   params: productParams,
   query: z
     .object({
-      category: z
-        .enum([
-          'stability',
-          'velocity',
-          'traction',
-          'reputation',
-          'support',
-          'discoverability',
-          'compliance',
-          'competitive',
-          'coverage',
-        ])
-        .optional(),
+      // Derived from the signal vocabulary rather than repeated, so a new
+      // category cannot be valid in the engine but rejected by the API.
+      category: z.enum(SIGNAL_CATEGORIES).optional(),
       minSeverity: z.enum(['info', 'low', 'medium', 'high', 'critical']).optional(),
     })
     .optional(),
