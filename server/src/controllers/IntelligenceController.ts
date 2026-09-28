@@ -13,6 +13,8 @@ import { IntelligenceScheduler } from '../services/intelligence/IntelligenceSche
 import { MarketDataService } from '../services/intelligence/MarketDataService';
 import { ReadmeAuditor } from '../services/intelligence/ReadmeAuditor';
 import { WpOrgClient } from '../services/intelligence/wporg/WpOrgClient';
+import { ChurnAnalytics } from '../services/intelligence/freemius/ChurnAnalytics';
+import { FreemiusSyncService, resolveCredentials } from '../services/intelligence/freemius/FreemiusSyncService';
 import { PromptRunner } from '../services/intelligence/llm/PromptRunner';
 
 import { Insight } from '../models/Insight';
@@ -790,6 +792,57 @@ export const getPortfolioHealth = async (req: Request, res: Response, next: Next
       unanalyzedProducts: products.length - perProduct.length,
       products: perProduct.sort((a, b) => a.overallScore - b.overallScore),
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/intelligence/:productId/churn
+ *
+ * Stated uninstall reasons for a product: counts, and the users' own words. It
+ * never interprets them. `connected` is reported separately from an empty
+ * result so the UI can tell "not set up" from "nobody left".
+ */
+export const getChurn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const product = await resolveProduct(req, res);
+    if (!product) return;
+
+    // Credentials sit on select:false fields, so re-read with them included.
+    const withKeys = await Product.findById(product._id)
+      .select('+freemiusPublicKey +freemiusSecretKey freemiusProductId');
+    const connected = !!(withKeys && resolveCredentials(withKeys));
+
+    // Clamped so a hand-edited query can't ask for an unbounded scan.
+    const windowDays = Math.min(Math.max(Number(req.query.windowDays) || 90, 7), 365);
+    const summary = await ChurnAnalytics.summarize(product._id as never, { windowDays, connected });
+    res.status(200).json(summary);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/intelligence/:productId/churn/sync
+ *
+ * Pulls new uninstall feedback on demand, so the panel can be populated without
+ * waiting for the six-hourly tick.
+ */
+export const syncChurn = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const product = await resolveProduct(req, res);
+    if (!product) return;
+
+    const withKeys = await Product.findById(product._id)
+      .select('+freemiusPublicKey +freemiusSecretKey freemiusProductId name ownerId');
+    if (!withKeys || !resolveCredentials(withKeys)) {
+      res.status(400).json({ message: 'This product is not connected to Freemius.' });
+      return;
+    }
+
+    const result = await FreemiusSyncService.syncProduct(withKeys);
+    res.status(200).json(result);
   } catch (error) {
     next(error);
   }

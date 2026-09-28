@@ -38,6 +38,9 @@ import {
   type MarketDataResponse,
   type CompetitiveMatrix,
   type AiStatus,
+  getChurn,
+  syncChurn,
+  type ChurnSummary,
 } from '../services/intelligence';
 
 /**
@@ -318,6 +321,26 @@ export function useUpdateIntelligenceConfig() {
     mutationFn: (configData: Partial<IntelligenceConfig>) => updateConfig(configData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['intelligence', 'config'] });
+    },
+  });
+}
+
+export function useChurn(productId: string | undefined | null, windowDays = 90) {
+  return useQuery<ChurnSummary>({
+    queryKey: ['intelligence', 'churn', productId, windowDays],
+    queryFn: () => getChurn(productId as string, { windowDays }),
+    enabled: !!productId,
+    staleTime: FRESH,
+  });
+}
+
+/** On-demand pull, so the panel can be filled without waiting for the scheduler. */
+export function useSyncChurn(productId: string | undefined | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncChurn(productId as string),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['intelligence', 'churn', productId] });
     },
   });
 }

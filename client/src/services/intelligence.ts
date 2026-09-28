@@ -658,3 +658,55 @@ export const triggerAnalysis = async (
   const { data } = await api.post(`/intelligence/${productId}/analyze`, { category });
   return data;
 };
+
+// --- Churn (Freemius uninstall feedback) ------------------------------------
+
+export interface ReasonBreakdown {
+  reasonId: number;
+  reason: string;
+  count: number;
+  /** Share of reports in the window, 0–100. */
+  share: number;
+  withText: number;
+}
+
+export interface ChurnQuote {
+  reasonId: number;
+  reason: string;
+  text: string;
+  uninstalledAt: string;
+  version?: string;
+}
+
+export interface ChurnSummary {
+  /** False when the product has no Freemius credentials resolved. */
+  connected: boolean;
+  windowDays: number;
+  total: number;
+  withText: number;
+  breakdown: ReasonBreakdown[];
+  quotes: ChurnQuote[];
+  lastReportAt: string | null;
+  totalAllTime: number;
+}
+
+export interface ChurnSyncResult {
+  examined: number;
+  stored: number;
+  withoutFeedback: number;
+  requests: number;
+  errors: string[];
+}
+
+export const getChurn = async (
+  productId: string,
+  params?: { windowDays?: number },
+): Promise<ChurnSummary> => {
+  const { data } = await api.get(`/intelligence/${productId}/churn`, { params });
+  return data;
+};
+
+export const syncChurn = async (productId: string): Promise<ChurnSyncResult> => {
+  const { data } = await api.post(`/intelligence/${productId}/churn/sync`);
+  return data;
+};

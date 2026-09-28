@@ -23,6 +23,7 @@ import { compareVersionDesc } from '../lib/versions';
 import { IssueManager } from '../components/issues/IssueManager';
 import { IntelligenceHub } from '../components/intelligence/IntelligenceHub';
 import { ReleaseReadinessPanel } from '../components/intelligence/ReleaseReadinessPanel';
+import { ChurnPanel } from '../components/intelligence/ChurnPanel';
 import { WpReadmeViewer } from '../components/products/WpReadmeViewer';
 import { ReleasePublish } from '../components/products/ReleasePublish';
 import { MediaCarousel } from '@/components/ui/media-carousel';
@@ -270,7 +271,7 @@ export default function ProductDetails() {
   // Single source for this product's versions — drives the filter options and
   // the "Latest" flag on activity cards (shared with VersionManager's cache).
   const { versions: productVersions } = useProductVersions(id);
-  const [activeTab, setActiveTab] = useState<'activities' | 'marketing' | 'versions' | 'readme' | 'release' | 'issues' | 'intelligence'>('activities');
+  const [activeTab, setActiveTab] = useState<'activities' | 'marketing' | 'versions' | 'readme' | 'release' | 'issues' | 'intelligence' | 'churn'>('activities');
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -654,6 +655,16 @@ export default function ProductDetails() {
           >
             Issues
           </button>
+          {/* Only offered once the product is linked to Freemius — the panel
+              has nothing to show otherwise. */}
+          {product?.freemiusProductId && (
+            <button
+              className={`pb-2 text-lg font-bold border-b-2 transition-colors ${activeTab === 'churn' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setActiveTab('churn')}
+            >
+              Churn
+            </button>
+          )}
           {product?.wpReadme && (
             <button 
               className={`pb-2 text-lg font-bold border-b-2 transition-colors ${activeTab === 'readme' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
@@ -663,6 +674,12 @@ export default function ProductDetails() {
             </button>
           )}
         </div>
+
+        {activeTab === 'churn' && (
+          <div className="mt-6 mb-12">
+            <ChurnPanel productId={id as string} />
+          </div>
+        )}
 
         {activeTab === 'intelligence' && (
           <div className="mt-6 mb-12">

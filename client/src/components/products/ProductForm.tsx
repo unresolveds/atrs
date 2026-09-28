@@ -37,6 +37,7 @@ const buildSchema = (variant: ProductFormVariant) =>
     banner: z.string().optional(),
     wpOrgSlug: z.string().optional(),
     repoPath: z.string().optional(),
+    freemiusProductId: z.string().regex(/^[0-9]*$/, 'Numbers only').optional(),
   });
 
 type FormValues = z.infer<ReturnType<typeof buildSchema>>;
@@ -84,6 +85,7 @@ export function ProductForm({
       banner: '',
       wpOrgSlug: '',
       repoPath: '',
+      freemiusProductId: '',
     },
   });
 
@@ -220,6 +222,27 @@ export function ProductForm({
                 initialPath={field.value || ''}
                 onSelect={(p) => field.onChange(p)}
               />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control as any}
+          name="freemiusProductId"
+          render={({ field }: any) => (
+            <FormItem>
+              <FormLabel>Freemius product ID (optional)</FormLabel>
+              <FormControl>
+                <Input inputMode="numeric" placeholder="e.g. 6749" {...field} />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                Links this product to its Freemius account so the{' '}
+                <span className="font-medium">Churn</span> tab can show why users uninstalled. Find it in
+                the Freemius dashboard URL for the product. The API keys are set separately, through the{' '}
+                <span className="font-mono">FREEMIUS_*</span> environment variables — they are never
+                entered here.
+              </p>
+              <FormMessage />
             </FormItem>
           )}
         />

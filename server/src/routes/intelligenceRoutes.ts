@@ -44,6 +44,11 @@ router.delete('/roadmap/:itemId', IntelligenceController.deleteRoadmapItem);
 
 // Evidence layer — the deterministic facts every narrative is built from.
 router.get('/:productId/signals', validate(getSignalsSchema), IntelligenceController.getSignals);
+
+// Uninstall feedback. The GET is a read over stored rows; the POST pulls new
+// ones from Freemius on demand for the product being viewed.
+router.get('/:productId/churn', validate(productParamsSchema), IntelligenceController.getChurn);
+router.post('/:productId/churn/sync', validate(productParamsSchema), IntelligenceController.syncChurn);
 router.get('/:productId/market', validate(productParamsSchema), IntelligenceController.getMarketData);
 router.get('/:productId/listing-audit', validate(productParamsSchema), IntelligenceController.getListingAudit);
 
